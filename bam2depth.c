@@ -8,6 +8,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <limits.h>
 #include "bam.h"
 
 typedef struct {     // auxiliary data structure
@@ -36,6 +37,7 @@ int main_depth(int argc, char *argv[])
 #endif
 {
 	int i, n, tid, beg, end, pos, *n_plp, baseQ = 0, mapQ = 0;
+	int maxDepth=INT_MAX; //I'd rather use a long here but needs to be int to fit into samtools. at least samtools use > so INT_MAX should always pass
 	const bam_pileup1_t **plp;
 	char *reg = 0; // specified region
 	void *bed = 0; // BED data structure
@@ -44,12 +46,13 @@ int main_depth(int argc, char *argv[])
 	bam_mplp_t mplp;
 
 	// parse the command line
-	while ((n = getopt(argc, argv, "r:b:q:Q:")) >= 0) {
+	while ((n = getopt(argc, argv, "r:b:q:Q:d:")) >= 0) {
 		switch (n) {
 			case 'r': reg = strdup(optarg); break;   // parsing a region requires a BAM header
 			case 'b': bed = bed_read(optarg); break; // BED or position list file can be parsed now
 			case 'q': baseQ = atoi(optarg); break;   // base quality threshold
 			case 'Q': mapQ = atoi(optarg); break;    // mapping quality threshold
+			case 'd': maxDepth = atoi(optarg); break;    // approximate max number of reads/base (in samtools version this is a hidden magic 8000)
 		}
 	}
 	if (optind == argc) {
@@ -80,6 +83,7 @@ int main_depth(int argc, char *argv[])
 
 	// the core multi-pileup loop
 	mplp = bam_mplp_init(n, read_bam, (void**)data); // initialization
+	bam_mplp_set_maxcnt(mplp,maxDepth);
 	n_plp = calloc(n, sizeof(int)); // n_plp[i] is the number of covering reads from the i-th BAM
 	plp = calloc(n, sizeof(void*)); // plp[i] points to the array of covering reads (internal in mplp)
 	while (bam_mplp_auto(mplp, &tid, &pos, n_plp, plp) > 0) { // come to the next covered position
