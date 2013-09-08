@@ -1,5 +1,5 @@
 SAMDIR=/home/shescott/installs/samtools
-all : bamSplice bamSplice2 bam2depth
+all : bamSplice bamSplice2 bam2depth bedCount
 
 bamSplice : bamSplice.c logFactorial.o
 	gcc -g -O2 -Wall -o bamSplice -D_MAIN_BAM2DEPTH bamSplice.c logFactorial.o -L$(SAMDIR) -lbam -lz -lm -lpthread -I$(SAMDIR) 
@@ -12,3 +12,6 @@ bamSplice2 : bamSplice2.c logFactorial.o
 
 bam2depth : bam2depth.c
 	gcc -g -O2 -Wall -o bam2depth -D_MAIN_BAM2DEPTH bam2depth.c -L$(SAMDIR) -lbam -lz -I$(SAMDIR) 
+
+bedCount : bedCount.c
+	gcc -g -O2 -Wall -o bedCount -D_MAIN_BAM2DEPTH bedCount.c -L$(SAMDIR) -lbam -lz -lpthread -I$(SAMDIR) 
