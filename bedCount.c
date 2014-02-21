@@ -22,7 +22,67 @@
 
 #define BED_READ_LENGTH 3000
 #define DEBUG 0
+//assuming chr name <200 characters
+#define MAX_CHR_LENGTH 200
 
+
+typedef struct {
+	int32_t nNames;
+	int32_t nBuffers;
+	char** names;
+} nameBuffer;
+
+#define NEW_NAME_BUFFER(X) nameBuffer X = {.nNames=0, .nBuffers=0}
+
+void addBuffersToNameBuffer(nameBuffer* buffer, int32_t n){
+	int32_t newN;
+	newN=buffer->nBuffers+n;
+	char** newBuffer;
+	int ii;
+	newBuffer=(char **)malloc(newN*sizeof(char *));
+	for(ii=0;ii<buffer->nNames;ii++)newBuffer[ii]=buffer->names[ii];
+	if(buffer->nNames>0)free(buffer->names);
+	buffer->names=newBuffer;
+	buffer->nBuffers=newN;
+}
+
+void clearBuffer(nameBuffer* buffer){
+	int ii;
+	for(ii=0;ii<buffer->nNames;ii++)free(buffer->names[ii]);
+	buffer->nNames=0;
+}
+
+void addNameToBuffer(nameBuffer* buffer, const char * name){
+	if(buffer->nNames+1>buffer->nBuffers){
+		addBuffersToNameBuffer(buffer,10000);
+	}
+	//don't need nNames+1 because 0 based array
+	buffer->names[buffer->nNames]=(char *)malloc((strlen(name))*sizeof(char));
+	strcpy(buffer->names[buffer->nNames],name);
+	buffer->nNames++;
+}
+
+int cstring_cmp(const void *a, const void *b){
+	const char **ia = (const char **)a;
+	const char **ib = (const char **)b;
+	return strcmp(*ia, *ib);
+}
+
+int32_t countUniqueNamesInBuffer(nameBuffer* buffer){
+	int ii;
+	//don't need to do anything if 0 or 1 names
+	if(buffer->nNames<2)return(buffer->nNames);
+	//sort the names in buffer
+	qsort(buffer->names,buffer->nNames,sizeof(char*),cstring_cmp);
+	//count uniques in sorted buffer
+	int32_t uniqCount=1;
+	//for(ii=0;ii<buffer->nNames;ii++)printf("%d %s\n",ii,buffer->names[ii]);
+	for(ii=1;ii<buffer->nNames;ii++){
+		//printf("%s==%s\n",buffer->names[ii-1],buffer->names[ii]);
+		if(strcmp(buffer->names[ii-1],buffer->names[ii])!=0)uniqCount++;
+	}
+	return(uniqCount);
+}
 
 
 typedef struct {     // auxiliary data structure
@@ -32,7 +92,7 @@ typedef struct {     // auxiliary data structure
 } aux_t;
 
 typedef struct {
-	char chr[200]; //assuming chr name <200 characters
+	char chr[MAX_CHR_LENGTH];
 	int start, tStart;
 	int end;
 	int32_t tid;
@@ -193,7 +253,9 @@ int assignTidToLocations(struct regionArray *locations, bam_header_t *h){
 typedef struct {
 	int *counter;
 	struct regionArray regionArray;
+	nameBuffer names;
 } fetchData;
+#define NEW_FETCH_DATA(X) fetchData X;X.names.nNames=0;X.names.nBuffers=0;
 
 
 // callback for bam_fetch()  
@@ -208,7 +270,9 @@ int fetchFunc(const bam1_t *b, void *data){
 	int operationEnd;
 	int isInsideTarget=0;
 	//flag 256 => not primary alignment. samtools depth appears to ignore these by default so I guess I'll follow
-	if(b->core.flag & 256)return(0);
+	//flag 1 => read paired. Only keep pairs (could add option)
+	//flag 2 => read mapped in proper pair. Only keep proper pairs
+	if(b->core.flag & BAM_FSECONDARY || !(b->core.flag & BAM_FPAIRED) || !(b->core.flag & BAM_FPROPER_PAIR))return(0);
 
 	for(ii=0;ii<b->core.n_cigar;ii++){
 		operation=((cigarBuffer[ii])&0xf);
@@ -232,6 +296,7 @@ int fetchFunc(const bam1_t *b, void *data){
 		genomePos=operationEnd+1;
 	}
 	if(isInsideTarget)*regionArrayAndCounter->counter=*regionArrayAndCounter->counter+1;
+	if(isInsideTarget)addNameToBuffer(&regionArrayAndCounter->names,bam1_qname(b));
 	//free(cigarBuffer); //I think bam1_cigar actually returns a pointer to something inside b and things crash if we free it. let bam take care of it
 	return(0);  
 }
@@ -287,7 +352,8 @@ int getCountsFromFiles(aux_t **data, bam_index_t **indices, int nFiles, region r
 
 int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStopArray *breaks, const region *location, int nFiles, int **exonCounts){
 	int ii,jj;
-	fetchData regionArrayAndCounter;
+	//fetchData regionArrayAndCounter;
+	NEW_FETCH_DATA(regionArrayAndCounter);
 
 	regionArrayAndCounter.regionArray.regions=(region*)malloc(sizeof(region));
 	regionArrayAndCounter.regionArray.regions[0].tid=location->tid;
@@ -306,7 +372,12 @@ int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStop
 			regionArrayAndCounter.counter=&exonCounts[jj][ii];
 			*regionArrayAndCounter.counter=0;
 			bam_fetch(data[jj]->fp,indices[jj],regionArrayAndCounter.regionArray.regions[0].tid,regionArrayAndCounter.regionArray.regions[0].tStart,regionArrayAndCounter.regionArray.regions[0].end, &regionArrayAndCounter, fetchFunc);
-			if(DEBUG)fprintf(stderr," Count%d: %d ",jj,exonCounts[jj][ii]);
+			if(DEBUG)fprintf(stderr," Naive count%d: %d All names%d: %d Unique names%d: %d\n",jj,exonCounts[jj][ii],jj,regionArrayAndCounter.names.nNames,jj,countUniqueNamesInBuffer(&(regionArrayAndCounter.names)));
+			//could put an option here or not calculate naive count
+			exonCounts[jj][ii]=countUniqueNamesInBuffer(&(regionArrayAndCounter.names));
+			//int kk;
+			//for(kk=0;kk<regionArrayAndCounter.names.nNames;kk++)printf("%s ",regionArrayAndCounter.names.names[kk]);
+			clearBuffer(&(regionArrayAndCounter.names));
 		}
 		if(DEBUG)fprintf(stderr,"\n");
 	}
