@@ -14,7 +14,6 @@
 #include <pthread.h>
 #include "bam.h"
 
-
 #define WORSTPVAL -DBL_MAX
 #define NOCHROM 2
 #define NOREADS 3
@@ -180,7 +179,7 @@ int getBedLine(FILE *fp,region* out){
 			tmp[tmpPos]='\0';
 			switch (field) {
 				case 0: strcpy(out->chr,tmp); break;
-				case 1: setRegionStart(out, atoi(tmp)+1); break; //+1 to deal with ucsc 0-bases starts
+				case 1: setRegionStart(out, atoi(tmp)+1); break; //+1 to deal with ucsc 0-based starts
 				case 2: out->end = atoi(tmp); break;
 			}
 
@@ -254,8 +253,9 @@ typedef struct {
 	int *counter;
 	struct regionArray regionArray;
 	nameBuffer names;
+	int onlyPaired;
 } fetchData;
-#define NEW_FETCH_DATA(X) fetchData X;X.names.nNames=0;X.names.nBuffers=0;
+#define NEW_FETCH_DATA(X) fetchData X;X.names.nNames=0;X.names.nBuffers=0;X.onlyPaired=1;
 
 
 // callback for bam_fetch()  
@@ -263,6 +263,7 @@ int fetchFunc(const bam1_t *b, void *data){
 	//convert data into regionArray
 	fetchData *regionArrayAndCounter=(fetchData*)data;
 	struct regionArray *region=&regionArrayAndCounter->regionArray;
+	int onlyPaired=regionArrayAndCounter->onlyPaired;
 	int ii,jj;
 	uint32_t operation,length;
 	uint32_t *cigarBuffer=bam1_cigar(b);
@@ -272,7 +273,7 @@ int fetchFunc(const bam1_t *b, void *data){
 	//flag 256 => not primary alignment. samtools depth appears to ignore these by default so I guess I'll follow
 	//flag 1 => read paired. Only keep pairs (could add option)
 	//flag 2 => read mapped in proper pair. Only keep proper pairs
-	if(b->core.flag & BAM_FSECONDARY || !(b->core.flag & BAM_FPAIRED) || !(b->core.flag & BAM_FPROPER_PAIR))return(0);
+	if(b->core.flag & BAM_FSECONDARY || ( onlyPaired && (!(b->core.flag & BAM_FPAIRED) || !(b->core.flag & BAM_FPROPER_PAIR))))return(0);
 
 	for(ii=0;ii<b->core.n_cigar;ii++){
 		operation=((cigarBuffer[ii])&0xf);
@@ -350,7 +351,7 @@ int getCountsFromFiles(aux_t **data, bam_index_t **indices, int nFiles, region r
 	return(!anyBase);//0 if any reads found
 }
 
-int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStopArray *breaks, const region *location, int nFiles, int **exonCounts){
+int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStopArray *breaks, const region *location, int nFiles, int **exonCounts, int onlyPaired){
 	int ii,jj;
 	//fetchData regionArrayAndCounter;
 	NEW_FETCH_DATA(regionArrayAndCounter);
@@ -358,6 +359,7 @@ int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStop
 	regionArrayAndCounter.regionArray.regions=(region*)malloc(sizeof(region));
 	regionArrayAndCounter.regionArray.regions[0].tid=location->tid;
 	regionArrayAndCounter.regionArray.num=1;
+	regionArrayAndCounter.onlyPaired=onlyPaired;
 	strcpy(regionArrayAndCounter.regionArray.regions[0].chr,location->chr);
 
 	for(ii=0;ii<breaks->num;ii++){ 
@@ -412,7 +414,7 @@ int destroyExonCountArray(exonCountArray *exonStore, int num){
 	return(0);
 }
 
-double getCountForRegion(region location, bam_index_t **indices, aux_t **data, int nFiles, int breakPadding, exonCountArray *exonStoreCell){
+double getCountForRegion(region location, bam_index_t **indices, aux_t **data, int nFiles, int breakPadding, exonCountArray *exonStoreCell, int onlyPaired){
 	int nBases;
 	int ii;
 	startStopArray breaks;
@@ -432,7 +434,7 @@ double getCountForRegion(region location, bam_index_t **indices, aux_t **data, i
 	int **exonCounts=calloc(nFiles,sizeof(int*));
 	for(ii=0;ii<nFiles;ii++)exonCounts[ii]=calloc(breaks.num,sizeof(int));
 
-	getUniqueReadsFromFiles(data, indices, &breaks, &location, nFiles, exonCounts);
+	getUniqueReadsFromFiles(data, indices, &breaks, &location, nFiles, exonCounts, onlyPaired);
 	
 	//Store break counts for later output
 	storeExonCounts(exonStoreCell,&breaks,exonCounts,nFiles,&location);
@@ -454,9 +456,8 @@ struct scoreArgs{
 	int nFiles;
 	int stepSize;
 	int start;
-
 	int breakPadding;
-
+	int onlyPaired;
 	exonCountArray *exonStore;
 };
 
@@ -466,7 +467,7 @@ void* getScoreParallel(void *getScoreArgs){
 	//if(DEBUG)fprintf(stderr,"Thread started. start: %d, stepsize:%d\n",args->start,args->stepSize);
 	for(ii=args->start;ii<args->locations.num;ii+=args->stepSize){
 		//if(DEBUG)fprintf(stderr,"Thread %d working on region %d (%s)\n",args->start,ii,printRegion(&args->locations.regions[ii]));
-		getCountForRegion(args->locations.regions[ii], args->indices, args->data, args->nFiles, args->breakPadding, &args->exonStore[ii]);
+		getCountForRegion(args->locations.regions[ii], args->indices, args->data, args->nFiles, args->breakPadding, &args->exonStore[ii],args->onlyPaired);
 		//if(DEBUG)fprintf(stderr,"Thread %d finished region %d. Score: %.3f\n",args->start,ii,args->scores[ii]);
 	}
 	pthread_exit(NULL);
@@ -493,17 +494,19 @@ int main_depth(int argc, char *argv[])
 
 	int nThreads=1;
 	int breakPadding=15;
+	int onlyPaired=1;
 	
 	//storing read counts in exons
 	exonCountArray *exonStore;
 
 	// parse the command line
-	while ((ii = getopt(argc, argv, "b:Q:B:t:")) >= 0) {
+	while ((ii = getopt(argc, argv, "b:Q:B:t:s")) >= 0) {
 		switch (ii) {
 			case 'b': bed = strdup(optarg); break; // BED or position list file can be parsed now
 			case 'Q': mapQ = atoi(optarg); break;    // mapping quality threshold
 			case 'B': breakPadding = atoi(optarg); break; //don't count reads only falling within this number of bases within break
 			case 't': nThreads = atoi(optarg); break; //number of threads to use
+			case 's': onlyPaired = 0; break; //number of threads to use
 		}
 	}
 
@@ -576,6 +579,7 @@ int main_depth(int argc, char *argv[])
 		args[ii].stepSize=nThreads;
 		args[ii].start=ii;
 		args[ii].exonStore=exonStore;
+		args[ii].onlyPaired=onlyPaired;
 		if(pthread_create(&threads[ii],NULL,getScoreParallel,&args[ii])){fprintf(stderr,"Couldn't create thread");exit(9);}
 	}
 	for(ii=0;ii<nThreads;ii++){

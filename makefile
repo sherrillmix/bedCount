@@ -15,3 +15,7 @@ bam2depth : bam2depth.c
 
 bedCount : bedCount.c
 	gcc -g -O2 -Wall -o bedCount -D_MAIN_BAM2DEPTH bedCount.c -L$(SAMDIR) -lbam -lz -lpthread -I$(SAMDIR) 
+
+
+oldBedCount : oldBedCount.c
+	gcc -g -O2 -Wall -o oldBedCount -D_MAIN_BAM2DEPTH oldBedCount.c -L$(SAMDIR) -lbam -lz -lpthread -I$(SAMDIR) 
