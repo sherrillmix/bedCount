@@ -61,6 +61,20 @@ void addNameToBuffer(nameBuffer* buffer, const char * name){
 	buffer->nNames++;
 }
 
+void copyBufferToBuffer(nameBuffer* buffer1,nameBuffer* buffer2){
+	int ii;
+	for(ii=0;ii<buffer1->nNames;ii++){
+		addNameToBuffer(buffer2,buffer1->names[ii]);
+	}
+}
+
+void destroyNameBuffer(nameBuffer* buffer){
+	clearBuffer(buffer);
+	free(buffer->names);
+	buffer->nBuffers=0;
+}
+
+
 int cstring_cmp(const void *a, const void *b){
 	const char **ia = (const char **)a;
 	const char **ib = (const char **)b;
@@ -351,7 +365,7 @@ int getCountsFromFiles(aux_t **data, bam_index_t **indices, int nFiles, region r
 	return(!anyBase);//0 if any reads found
 }
 
-int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStopArray *breaks, const region *location, int nFiles, int **exonCounts, int onlyPaired){
+int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStopArray *breaks, const region *location, int nFiles, int **exonCounts, int onlyPaired, nameBuffer *nameStores,int reportGlobalUnique){
 	int ii,jj;
 	//fetchData regionArrayAndCounter;
 	NEW_FETCH_DATA(regionArrayAndCounter);
@@ -377,10 +391,14 @@ int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStop
 			if(DEBUG)fprintf(stderr," Naive count%d: %d All names%d: %d Unique names%d: %d\n",jj,exonCounts[jj][ii],jj,regionArrayAndCounter.names.nNames,jj,countUniqueNamesInBuffer(&(regionArrayAndCounter.names)));
 			//could put an option here or not calculate naive count
 			exonCounts[jj][ii]=countUniqueNamesInBuffer(&(regionArrayAndCounter.names));
+			//copy names to global buffer here
+			if(reportGlobalUnique)copyBufferToBuffer(&(regionArrayAndCounter.names),&nameStores[jj]);
 			//int kk;
 			//for(kk=0;kk<regionArrayAndCounter.names.nNames;kk++)printf("%s ",regionArrayAndCounter.names.names[kk]);
 			clearBuffer(&(regionArrayAndCounter.names));
 		}
+		destroyNameBuffer(&regionArrayAndCounter.names);
+		free(regionArrayAndCounter.regionArray.regions);
 		if(DEBUG)fprintf(stderr,"\n");
 	}
 	return(0);
@@ -414,7 +432,7 @@ int destroyExonCountArray(exonCountArray *exonStore, int num){
 	return(0);
 }
 
-double getCountForRegion(region location, bam_index_t **indices, aux_t **data, int nFiles, int breakPadding, exonCountArray *exonStoreCell, int onlyPaired){
+double getCountForRegion(region location, bam_index_t **indices, aux_t **data, int nFiles, int breakPadding, exonCountArray *exonStoreCell, int onlyPaired, nameBuffer *nameStores,int reportGlobalUnique){
 	int nBases;
 	int ii;
 	startStopArray breaks;
@@ -434,7 +452,7 @@ double getCountForRegion(region location, bam_index_t **indices, aux_t **data, i
 	int **exonCounts=calloc(nFiles,sizeof(int*));
 	for(ii=0;ii<nFiles;ii++)exonCounts[ii]=calloc(breaks.num,sizeof(int));
 
-	getUniqueReadsFromFiles(data, indices, &breaks, &location, nFiles, exonCounts, onlyPaired);
+	getUniqueReadsFromFiles(data, indices, &breaks, &location, nFiles, exonCounts, onlyPaired, nameStores,reportGlobalUnique);
 	
 	//Store break counts for later output
 	storeExonCounts(exonStoreCell,&breaks,exonCounts,nFiles,&location);
@@ -459,6 +477,8 @@ struct scoreArgs{
 	int breakPadding;
 	int onlyPaired;
 	exonCountArray *exonStore;
+	nameBuffer *nameStore;
+	int reportGlobalUnique;
 };
 
 void* getScoreParallel(void *getScoreArgs){
@@ -467,7 +487,7 @@ void* getScoreParallel(void *getScoreArgs){
 	//if(DEBUG)fprintf(stderr,"Thread started. start: %d, stepsize:%d\n",args->start,args->stepSize);
 	for(ii=args->start;ii<args->locations.num;ii+=args->stepSize){
 		//if(DEBUG)fprintf(stderr,"Thread %d working on region %d (%s)\n",args->start,ii,printRegion(&args->locations.regions[ii]));
-		getCountForRegion(args->locations.regions[ii], args->indices, args->data, args->nFiles, args->breakPadding, &args->exonStore[ii],args->onlyPaired);
+		getCountForRegion(args->locations.regions[ii], args->indices, args->data, args->nFiles, args->breakPadding, &args->exonStore[ii],args->onlyPaired,args->nameStore,args->reportGlobalUnique);
 		//if(DEBUG)fprintf(stderr,"Thread %d finished region %d. Score: %.3f\n",args->start,ii,args->scores[ii]);
 	}
 	pthread_exit(NULL);
@@ -495,18 +515,22 @@ int main_depth(int argc, char *argv[])
 	int nThreads=1;
 	int breakPadding=15;
 	int onlyPaired=1;
+	int *globalCounts;
+	int reportGlobalUnique=0;
 	
 	//storing read counts in exons
 	exonCountArray *exonStore;
+	nameBuffer **nameStore;
 
 	// parse the command line
-	while ((ii = getopt(argc, argv, "b:Q:B:t:s")) >= 0) {
+	while ((ii = getopt(argc, argv, "b:Q:B:t:s:G")) >= 0) {
 		switch (ii) {
 			case 'b': bed = strdup(optarg); break; // BED or position list file can be parsed now
 			case 'Q': mapQ = atoi(optarg); break;    // mapping quality threshold
 			case 'B': breakPadding = atoi(optarg); break; //don't count reads only falling within this number of bases within break
 			case 't': nThreads = atoi(optarg); break; //number of threads to use
-			case 's': onlyPaired = 0; break; //number of threads to use
+			case 's': onlyPaired = 0; break; //only report good pairs
+			case 'G': reportGlobalUnique = 1; break; //report the total unique reads in all regions
 		}
 	}
 
@@ -567,7 +591,15 @@ int main_depth(int argc, char *argv[])
 	args=(struct scoreArgs *)malloc(nThreads*sizeof(struct scoreArgs));
 	exonStore=(exonCountArray *)malloc(locations.num*sizeof(exonCountArray));
 	for(ii=0;ii<locations.num;ii++)exonStore[ii].exonNum=0;
-	
+	nameStore=(nameBuffer **)malloc(nThreads*sizeof(nameBuffer*));
+	for(ii=0;ii<nThreads;ii++){
+		nameStore[ii]=(nameBuffer *)malloc(nFiles*sizeof(nameBuffer));
+		for(jj=0;jj<nFiles;jj++){
+			nameStore[ii][jj].nNames=0;
+			nameStore[ii][jj].nBuffers=0;
+			if(reportGlobalUnique)addBuffersToNameBuffer(&nameStore[ii][jj],200000); //save a bunch of room
+		}
+	}
 
 	for(ii=0;ii<nThreads;ii++){
 		//set up args
@@ -580,6 +612,8 @@ int main_depth(int argc, char *argv[])
 		args[ii].start=ii;
 		args[ii].exonStore=exonStore;
 		args[ii].onlyPaired=onlyPaired;
+		args[ii].nameStore=nameStore[ii];
+		args[ii].reportGlobalUnique=reportGlobalUnique;
 		if(pthread_create(&threads[ii],NULL,getScoreParallel,&args[ii])){fprintf(stderr,"Couldn't create thread");exit(9);}
 	}
 	for(ii=0;ii<nThreads;ii++){
@@ -587,6 +621,25 @@ int main_depth(int argc, char *argv[])
 	}
 	free(threads);
 	fprintExonCountArray(stdout,exonStore,locations.num);
+	if(reportGlobalUnique){
+		//find global uniques
+		globalCounts=(int *)malloc(nFiles*sizeof(int));
+		fprintf(stdout, "GLOBAL\tGLOBAL");
+		for(jj=0;jj<nFiles;jj++){
+			for(ii=1;ii<nThreads;ii++){ //use name[ii][0] as base
+				copyBufferToBuffer(&nameStore[ii][jj],&nameStore[0][jj]);
+				destroyNameBuffer(&nameStore[ii][jj]);
+			}
+			globalCounts[jj]=countUniqueNamesInBuffer(&nameStore[0][jj]);
+			fprintf(stdout, "\t%d",globalCounts[jj]);
+			destroyNameBuffer(&nameStore[0][jj]);
+		}
+		fprintf(stdout, "\n");
+		free(globalCounts);
+	}
+	
+	for(ii=0;ii<nThreads;ii++)free(nameStore[ii]);
+	free(nameStore);
 	free(args);
 	destroyExonCountArray(exonStore,locations.num);
 	destroyRegionArray(locations);
