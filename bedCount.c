@@ -69,9 +69,11 @@ void copyBufferToBuffer(nameBuffer* buffer1,nameBuffer* buffer2){
 }
 
 void destroyNameBuffer(nameBuffer* buffer){
-	clearBuffer(buffer);
-	free(buffer->names);
-	buffer->nBuffers=0;
+	if(buffer->nBuffers>0){
+		clearBuffer(buffer);
+		free(buffer->names);
+		buffer->nBuffers=0;
+	}
 }
 
 
@@ -188,8 +190,8 @@ int getBedLine(FILE *fp,region* out){
 	int ii;
 	int tmpPos=0;
 	int field=0;
-	for(ii=0;ii<BED_READ_LENGTH;ii++){
-		if(buffer[ii]=='\t'){
+	for(ii=0;ii<strlen(buffer);ii++){
+		if(buffer[ii]=='\t'||buffer[ii]=='\n'){
 			tmp[tmpPos]='\0';
 			switch (field) {
 				case 0: strcpy(out->chr,tmp); break;
@@ -479,6 +481,7 @@ struct scoreArgs{
 	exonCountArray *exonStore;
 	nameBuffer *nameStore;
 	int reportGlobalUnique;
+	int vocal;
 };
 
 void* getScoreParallel(void *getScoreArgs){
@@ -486,6 +489,10 @@ void* getScoreParallel(void *getScoreArgs){
 	struct scoreArgs *args=(struct scoreArgs *)getScoreArgs;
 	//if(DEBUG)fprintf(stderr,"Thread started. start: %d, stepsize:%d\n",args->start,args->stepSize);
 	for(ii=args->start;ii<args->locations.num;ii+=args->stepSize){
+		if(args->vocal){
+			fprintf(stderr,".");
+			fflush(stderr);
+		}
 		//if(DEBUG)fprintf(stderr,"Thread %d working on region %d (%s)\n",args->start,ii,printRegion(&args->locations.regions[ii]));
 		getCountForRegion(args->locations.regions[ii], args->indices, args->data, args->nFiles, args->breakPadding, &args->exonStore[ii],args->onlyPaired,args->nameStore,args->reportGlobalUnique);
 		//if(DEBUG)fprintf(stderr,"Thread %d finished region %d. Score: %.3f\n",args->start,ii,args->scores[ii]);
@@ -517,13 +524,14 @@ int main_depth(int argc, char *argv[])
 	int onlyPaired=1;
 	int *globalCounts;
 	int reportGlobalUnique=0;
+	int vocal=0;
 	
 	//storing read counts in exons
 	exonCountArray *exonStore;
 	nameBuffer **nameStore;
 
 	// parse the command line
-	while ((ii = getopt(argc, argv, "b:Q:B:t:s:G")) >= 0) {
+	while ((ii = getopt(argc, argv, "b:Q:B:t:sGv")) >= 0) {
 		switch (ii) {
 			case 'b': bed = strdup(optarg); break; // BED or position list file can be parsed now
 			case 'Q': mapQ = atoi(optarg); break;    // mapping quality threshold
@@ -531,6 +539,7 @@ int main_depth(int argc, char *argv[])
 			case 't': nThreads = atoi(optarg); break; //number of threads to use
 			case 's': onlyPaired = 0; break; //only report good pairs
 			case 'G': reportGlobalUnique = 1; break; //report the total unique reads in all regions
+			case 'v': vocal = 1; break; //report progress to stderr
 		}
 	}
 
@@ -614,6 +623,7 @@ int main_depth(int argc, char *argv[])
 		args[ii].onlyPaired=onlyPaired;
 		args[ii].nameStore=nameStore[ii];
 		args[ii].reportGlobalUnique=reportGlobalUnique;
+		args[ii].vocal=vocal;
 		if(pthread_create(&threads[ii],NULL,getScoreParallel,&args[ii])){fprintf(stderr,"Couldn't create thread");exit(9);}
 	}
 	for(ii=0;ii<nThreads;ii++){
