@@ -1,5 +1,4 @@
-/* This program demonstrates how to generate pileup from multiple BAMs
- * simutaneously, to achieve random access and to use the BED interface.
+/* This program demonstrates how to generate pileup from multiple BAMs * simutaneously, to achieve random access and to use the BED interface.
  * To compile this program separately, you may:
  *
  *   gcc -g -O2 -Wall -o bam2depth -D_MAIN_BAM2DEPTH bam2depth.c -L. -lbam -lz
@@ -437,14 +436,13 @@ int destroyExonCountArray(exonCountArray *exonStore, int num){
 double getCountForRegion(region location, bam_index_t **indices, aux_t **data, int nFiles, int breakPadding, exonCountArray *exonStoreCell, int onlyPaired, nameBuffer *nameStores,int reportGlobalUnique){
 	int nBases;
 	int ii;
+	int isTooShort=0;
 	startStopArray breaks;
 
 	if(location.tid<0)return(NOCHROM);
 
 	nBases=location.end-location.start+1;
-	if(nBases<=2*breakPadding){
-		return(TOOSHORT);
-	}
+	if(nBases<=2*breakPadding)isTooShort=1; //don't return here since we want to store zeros
 
 	breaks.num=1;
 	for(ii=0;ii<2;ii++)breaks.startStop[ii]=calloc(1,sizeof(int));
@@ -454,7 +452,7 @@ double getCountForRegion(region location, bam_index_t **indices, aux_t **data, i
 	int **exonCounts=calloc(nFiles,sizeof(int*));
 	for(ii=0;ii<nFiles;ii++)exonCounts[ii]=calloc(breaks.num,sizeof(int));
 
-	getUniqueReadsFromFiles(data, indices, &breaks, &location, nFiles, exonCounts, onlyPaired, nameStores,reportGlobalUnique);
+	if(!isTooShort)getUniqueReadsFromFiles(data, indices, &breaks, &location, nFiles, exonCounts, onlyPaired, nameStores,reportGlobalUnique);
 	
 	//Store break counts for later output
 	storeExonCounts(exonStoreCell,&breaks,exonCounts,nFiles,&location);
@@ -465,7 +463,8 @@ double getCountForRegion(region location, bam_index_t **indices, aux_t **data, i
 	destroyStartStopArray(&breaks);
 
 	//might want to return break coords and counts too 
-	return(0);
+	if(isTooShort)return(TOOSHORT);
+	else return(0);
 }
 
 
