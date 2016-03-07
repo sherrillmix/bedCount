@@ -17,6 +17,10 @@ samtools/samtools view -bS $samFile >$bamFile 2>/dev/null
 samtools sort -f $bamFile ${sortBamFile}
 samtools index $sortBamFile
 
+bedFile=$(tempfile).bed
+echo "chr1 19 20
+chr1 24 25">$bedFile
+
 
 ./bedCount 2>/dev/null && { echo "Missing files did not fail"; exit 1; }
 ./bedCount -h |grep Usage >/dev/null|| { echo "-h did not generate usage"; exit 1; }
@@ -29,4 +33,6 @@ samtools index $sortBamFile
 ./bam2depth -$'\05' 2>/dev/null&& { echo "Weird arg did not fail"; exit 1; }
 ./bam2depth $bamFile |head -1|grep "chr1	10	3" >/dev/null|| { echo "Unexpected output for bamFile"; exit 1; }
 ./bam2depth $sortBamFile -r chr1:19-20|head -1|grep "chr1	19	4" >/dev/null|| { echo "Unexpected output for region"; exit 1; }
+./bam2depth $sortBamFile -b $bedFile|head -1|grep "chr1	20	1" >/dev/null|| { echo "Unexpected start output for bedFile"; exit 1; }
+./bam2depth $sortBamFile -b $bedFile|tail -1|grep "chr1	25	1" >/dev/null|| { echo "Unexpected end output for bedFile"; exit 1; }
 exit 0
