@@ -26,7 +26,7 @@ test: bam2depth.c bedCount.c tests.bash testBed.c makefile
 	$(CC) -Wall -o bedCount.c -lz -lpthread -coverage
 	#$(CC) -Wall -o testBed testBed.c -lz -lpthread -coverage 
 	#./testBed
-	#bash tests.bash
+	bash tests.bash
 	#gcov main.c tree.h tree.c
 	#rm suffixc tree.o
 	#make all
