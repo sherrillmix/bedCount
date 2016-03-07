@@ -505,7 +505,6 @@ int main(int argc, char *argv[])
 int main_depth(int argc, char *argv[])
 #endif
 {
-
 	int ii, jj, nFiles, mapQ = 20;
 	bam_header_t *h=0; // BAM header of the 1st input
 	aux_t ***data;
@@ -529,8 +528,12 @@ int main_depth(int argc, char *argv[])
 	exonCountArray *exonStore;
 	nameBuffer **nameStore;
 
+  char usage[50000];
+  sprintf(usage,"Usage: %.1000s [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] <in1.bam> [...]\n  first and additional arguments: bam files to be parsed\n -Q: only count reads with a map quality greater than or equal this (default:0) \n -B: don't count reads only falling within this number of bases of the borders of a region\n -t: number of threads to use\n -s: only report good pairs -G report the total unique reads combined over all the regions\n -v: increase verbosity\n -h: (optional) display this message and exit\n",argv[0]);
+
+
 	// parse the command line
-	while ((ii = getopt(argc, argv, "b:Q:B:t:sGv")) >= 0) {
+	while ((ii = getopt(argc, argv, "b:Q:B:t:sGvh")) >= 0) {
 		switch (ii) {
 			case 'b': bed = strdup(optarg); break; // BED or position list file can be parsed now
 			case 'Q': mapQ = atoi(optarg); break;    // mapping quality threshold
@@ -539,6 +542,9 @@ int main_depth(int argc, char *argv[])
 			case 's': onlyPaired = 0; break; //only report good pairs
 			case 'G': reportGlobalUnique = 1; break; //report the total unique reads in all regions
 			case 'v': vocal = 1; break; //report progress to stderr
+			case 'h':
+        fprintf(stdout,"%s",usage);
+        return(0);
 		}
 	}
 
@@ -548,7 +554,7 @@ int main_depth(int argc, char *argv[])
 	}
 	
 	if (optind == argc) {
-		fprintf(stderr, "Usage: bamSplice [-q baseQthres] [-Q mapQthres] -b in.bed -g 1122... <in1.bam> [...]\n");
+		fprintf(stderr,"%s",usage);
 		return(1);
 	}
 	nFiles = argc - optind; // the number of BAMs on the command lined

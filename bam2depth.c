@@ -44,19 +44,30 @@ int main_depth(int argc, char *argv[])
 	bam_header_t *h = 0; // BAM header of the 1st input
 	aux_t **data;
 	bam_mplp_t mplp;
+  char usage[50000];
+  sprintf(usage,"Usage: %.1000s [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] <in1.bam> [...]\n first and additional arguments: bam files to be parsed\n -r: region to get coverage for in samtools format e.g. chr1:1000-1029 (default: all positions in the reference)\n  -q: only count positions with a quality greater than or equal this (default:0)\n -Q: only count reads with a map quality greater than or equal this (default:0) \n -d: approximate maximum depth counted for a base. In samtools version this is 8000. (default: INT_MAX)\n -h: (optional) display this message and exit\n",argv[0]);
 
 	// parse the command line
-	while ((n = getopt(argc, argv, "r:b:q:Q:d:")) >= 0) {
+	while ((n = getopt(argc, argv, "r:b:q:Q:d:h")) >= 0) {
 		switch (n) {
 			case 'r': reg = strdup(optarg); break;   // parsing a region requires a BAM header
 			case 'b': bed = bed_read(optarg); break; // BED or position list file can be parsed now
 			case 'q': baseQ = atoi(optarg); break;   // base quality threshold
 			case 'Q': mapQ = atoi(optarg); break;    // mapping quality threshold
 			case 'd': maxDepth = atoi(optarg); break;    // approximate max number of reads/base (in samtools version this is a hidden magic 8000)
+			case 'h':
+        fprintf(stdout,"%s",usage);
+        return(0);
+      case '?':
+        if (optopt<33)
+          fprintf (stderr, "Unknown option `-%c'.\n", optopt);
+        else
+          fprintf (stderr, "Unknown option character `\\x%x'.\n", optopt);
+        return 1;
 		}
 	}
 	if (optind == argc) {
-		fprintf(stderr, "Usage: bam2depth [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] <in1.bam> [...]\n");
+		fprintf(stderr,"%s", usage);
 		return 1;
 	}
 
