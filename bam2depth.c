@@ -36,7 +36,9 @@ int main(int argc, char *argv[])
 int main_depth(int argc, char *argv[])
 #endif
 {
-  int i, n, tid, beg, end, pos, *n_plp, baseQ = 0, mapQ = 0;
+  int i, n, tid, beg, end, pos, *n_plp;
+  int baseQ = 0;
+  int mapQ = 0;
   int maxDepth=INT_MAX; //I'd rather use a long here but needs to be int to fit into samtools. at least samtools use > so INT_MAX should always pass
   const bam_pileup1_t **plp;
   char *reg = 0; // specified region

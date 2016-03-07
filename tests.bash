@@ -34,15 +34,22 @@ samtools/samtools index $sortBamFile2
 
 
 bedFile=$(tempfile).bed
-echo "chr1 19 20
-chr1 24 25">$bedFile
+echo "chr1	19	20	region1
+chr1	24	25	region2">$bedFile
 
+bedFile2=$(tempfile).bed
+echo "chr1	19	20	region1
+chr1	24	25	region2">$bedFile2
 
 echo "Testing bedCount"
 ./bedCount 2>/dev/null && { echo "Missing files did not fail"; exit 1; }
 ./bedCount -h |grep Usage >/dev/null|| { echo "-h did not generate usage"; exit 1; }
 ./bedCount -Z 2>/dev/null&& { echo "Weird arg did not fail"; exit 1; }
 ./bedCount -$'\05' 2>/dev/null&& { echo "Weird arg did not fail"; exit 1; }
+./bedCount -b $bedFile 2>/dev/null&& { echo "bed no bam did not fail"; exit 1; }
+./bedCount -b $bedFile $sortBamFile  2>/dev/null|grep "	0$"|wc -l|grep '^2$' >/dev/null|| { echo "Unexpected bedCount output for bamFile with 0 left after border"; exit 1; }
+./bedCount -b $bedFile $sortBamFile $sortBamFile2 -B 0 2>/dev/null|head -1|grep "chr1:20-20	chr1:20-20	1	1" >/dev/null|| { echo "Unexpected output with 0 border"; exit 1; }
+./bedCount -b $bedFile $sortBamFile $sortBamFile2 -B 0 -s 2>/dev/null|head -1|grep "chr1:20-20	chr1:20-20	2	1" >/dev/null|| { echo "Unexpected output with 0 border and not require pair"; exit 1; }
 
 echo "Testing bam2depth"
 ./bam2depth 2>/dev/null && { echo "Missing files did not fail"; exit 1; }

@@ -505,7 +505,8 @@ int main(int argc, char *argv[])
 int main_depth(int argc, char *argv[])
 #endif
 {
-  int ii, jj, nFiles, mapQ = 20;
+  int ii, jj, nFiles; 
+  int mapQ = 0;
   bam_header_t *h=0; // BAM header of the 1st input
   aux_t ***data;
   bam_index_t ***indices;
@@ -529,7 +530,7 @@ int main_depth(int argc, char *argv[])
   nameBuffer **nameStore;
 
   char usage[50000];
-  sprintf(usage,"Usage: %.1000s [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] <in1.bam> [...]\n  first and additional arguments: bam files to be parsed\n -Q: only count reads with a map quality greater than or equal this (default:0) \n -B: don't count reads only falling within this number of bases of the borders of a region\n -t: number of threads to use\n -s: only report good pairs -G report the total unique reads combined over all the regions\n -v: increase verbosity\n -h: (optional) display this message and exit\n",argv[0]);
+  sprintf(usage,"Usage: %.1000s [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] <in1.bam> [...]\n  first and additional arguments: bam files to be parsed\n -Q: only count reads with a map quality greater than or equal this (default:0) \n -B: don't count reads only falling within this number of bases of the borders of a region (default: 15)\n -t: number of threads to use (default: 1)\n -s: only report good pairs (1 for only pairs, 0 for all, default: 1)\n -G report the total unique reads combined over all the regions\n -v: increase verbosity\n -h: display this message and exit\n",argv[0]);
 
 
   // parse the command line
