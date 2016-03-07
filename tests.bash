@@ -8,7 +8,7 @@ sortBamFile=${samFile%.sam}_sort.bam
 #qname flag rname pos mapq cigar mcrap mpos isize seq qual tags
 echo "@HD	VN:1.0	SO:coordinate	
 @SQ	SN:chr1	LN:1000
-read01	99	chr1	10	40	10M	=	18	0	ACACACACAC	>>>>>>>>>>
+read01	99	chr1	10	40	10M	=	18	0	TTCCTTTCCT	IIIIIIIIII
 read02	1	chr1	11	35	11M	=	1	0	ACACACACACA	>>>>>>>>>>>
 read03	1	chr1	10	40	10M	=	1	0	ACACACACAC	>>>>>>>>>>
 read01	147	chr1	19	40	10M	=	1	0	GGGGGTTTTT	>>>>>>>>>>
@@ -57,5 +57,7 @@ echo "Testing bam2depth"
 ./bam2depth $sortBamFile -r chr1:10-11 -Q 36|tail -1|grep "chr1	11	2" >/dev/null|| { echo ">36 map Q count messed up"; exit 1; }
 ./bam2depth $sortBamFile -r chr1:11-19 -d100|head -1|grep "chr1	11	3" >/dev/null|| { echo "Max depth count messed up"; exit 1; }
 ./bam2depth $sortBamFile $sortBamFile2 -r chr1:10-11 |tail -1|grep "chr1	11	3	2" >/dev/null|| { echo "Multiple depth count messed up"; exit 1; }
+./bam2depth $sortBamFile $sortBamFile2 -r chr1:10-11 -q 40 |tail -1|grep "chr1	11	1	0" >/dev/null|| { echo "Multiple depth count with base qual messed up"; exit 1; }
+./bam2depth $sortBamFile $sortBamFile2 -r chr1:10-11 -q 41 |tail -1|grep "chr1	11	0	0" >/dev/null|| { echo "Multiple depth count with base qual messed up"; exit 1; }
 echo "All clear"
 exit 0
