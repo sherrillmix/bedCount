@@ -38,7 +38,7 @@ echo "chr1	19	20	region1
 chr1	24	25	region2">$bedFile
 
 bedFile2=$(tempfile).bed
-echo "chr1	19	20	region1
+echo "chr1	1	25	region1
 chr1	24	25	region2">$bedFile2
 
 echo "Testing bedCount"
@@ -50,6 +50,9 @@ echo "Testing bedCount"
 ./bedCount -b $bedFile $sortBamFile  2>/dev/null|grep "	0$"|wc -l|grep '^2$' >/dev/null|| { echo "Unexpected bedCount output for bamFile with 0 left after border"; exit 1; }
 ./bedCount -b $bedFile $sortBamFile $sortBamFile2 -B 0 2>/dev/null|head -1|grep "chr1:20-20	chr1:20-20	1	1" >/dev/null|| { echo "Unexpected output with 0 border"; exit 1; }
 ./bedCount -b $bedFile $sortBamFile $sortBamFile2 -B 0 -s 2>/dev/null|head -1|grep "chr1:20-20	chr1:20-20	2	1" >/dev/null|| { echo "Unexpected output with 0 border and not require pair"; exit 1; }
+./bedCount -b $bedFile $sortBamFile $sortBamFile2 -B 0 -s -G 2>/dev/null|tail -1|grep "GLOBAL	GLOBAL	2	1" >/dev/null|| { echo "Unexpected output with 0 border and not require pair and global"; exit 1; }
+./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -s -G 2>/dev/null|tail -1|grep "GLOBAL	GLOBAL	3	2" >/dev/null|| { echo "Unexpected output with 0 border and not require pair and global"; exit 1; }
+./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -G 2>/dev/null|tail -1|grep "GLOBAL	GLOBAL	1	1" >/dev/null|| { echo "Unexpected output with 0 border and pair and global"; exit 1; }
 
 echo "Testing bam2depth"
 ./bam2depth 2>/dev/null && { echo "Missing files did not fail"; exit 1; }
