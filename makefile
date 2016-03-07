@@ -24,9 +24,9 @@ bedCount : bedCount.c samtools/libbam.a
 test: bam2depth.c bedCount.c tests.bash testBed.c makefile
 	$(CC) -Wall -c bam2depth.c -lz -lpthread -coverage
 	$(CC) -Wall -o bedCount.c -lz -lpthread -coverage
-	$(CC) -Wall -o testBed testBed.c -lz -lpthread -coverage 
-	./testBed
-	bash tests.bash
-	gcov main.c tree.h tree.c
-	rm suffixc tree.o
-	make suffixc
+	#$(CC) -Wall -o testBed testBed.c -lz -lpthread -coverage 
+	#./testBed
+	#bash tests.bash
+	#gcov main.c tree.h tree.c
+	#rm suffixc tree.o
+	#make all
