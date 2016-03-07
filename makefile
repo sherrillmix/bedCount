@@ -21,7 +21,8 @@ bam2depth : bam2depth.c samtools/libbam.a
 bedCount : bedCount.c samtools/libbam.a
 	$(CC) -o bedCount -D_MAIN_BAM2DEPTH bedCount.c $(FLAGS)
 
-test: bam2depth.c bedCount.c tests.bash testBed.c makefile
+#testBed.c 
+test: bam2depth.c bedCount.c tests.bash makefile
 	$(CC) -Wall -c bam2depth.c -lz -lpthread -coverage
 	$(CC) -Wall -o bedCount.c -lz -lpthread -coverage
 	#$(CC) -Wall -o testBed testBed.c -lz -lpthread -coverage 
