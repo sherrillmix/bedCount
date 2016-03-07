@@ -24,7 +24,7 @@ sortBamFile2=${samFile2%.sam}_sort.bam
 echo "@HD	VN:1.0	SO:coordinate	
 @SQ	SN:chr1	LN:1000
 read01	99	chr1	10	40	10M	=	18	0	ACACACACAC	>>>>>>>>>>
-read02	1	chr1	10	35	10M	=	1	0	ACACACACAC	>>>>>>>>>>
+read02	1	chr1	10	35	8M20D2M	=	1	0	ACACACACAC	>>>>>>>>>>
 read03	1	chr1	50	40	10M	=	1	0	ACACACACAC	>>>>>>>>>>
 read01	147	chr1	19	40	10M	=	1	0	GGGGGTTTTT	>>>>>>>>>>
 ">$samFile2
@@ -40,12 +40,21 @@ bedFile2=$(tempfile).bed
 echo "chr1	1	25	region1
 chr1	24	25	region2">$bedFile2
 
+bedFile3=$(tempfile).bed
+touch $bedFile3
+
+bedFile4=$(tempfile).bed
+echo "chrZ	1	25	region1
+chrZ	24	25	region2">$bedFile4
+
 echo "Testing bedCount"
 ./bedCount 2>/dev/null && { echo "Missing files did not fail"; exit 1; }
 ./bedCount -h |grep Usage >/dev/null|| { echo "-h did not generate usage"; exit 1; }
 ./bedCount -Z 2>/dev/null&& { echo "Weird arg did not fail"; exit 1; }
 ./bedCount -$'\05' 2>/dev/null&& { echo "Weird arg did not fail"; exit 1; }
 ./bedCount -b $bedFile 2>/dev/null&& { echo "bed no bam did not fail"; exit 1; }
+./bedCount -b $bedFile3 $sortBamFile  2>/dev/null&& { echo "empty bed did not fail"; exit 1; }
+./bedCount -b $bedFile4 $sortBamFile  2>/dev/null&& { echo "all bad chr did not fail"; exit 1; }
 ./bedCount -b $bedFile $sortBamFile  2>/dev/null|grep "	0$"|wc -l|grep '^2$' >/dev/null|| { echo "Unexpected bedCount output for bamFile with 0 left after border"; exit 1; }
 ./bedCount -b ${bedFile2}.NOTAREALFILE $sortBamFile $sortBamFile2 -B 0 -G 2>/dev/null&& { echo "non-existent bed did not fail"; exit 1; }
 ./bedCount -b $bedFile $sortBamFile $sortBamFile2 -B 0 2>/dev/null|head -1|grep "chr1:20-20	chr1:20-20	1	1" >/dev/null|| { echo "Unexpected output with 0 border"; exit 1; }
