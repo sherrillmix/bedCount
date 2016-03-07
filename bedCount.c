@@ -238,14 +238,6 @@ int readBed(FILE *bedFile, struct regionArray* out){
   return(0);
 }
 
-// This function reads a BAM alignment from one BAM file.
-static int read_bam(void *data, bam1_t *b){ // read level filters better go here to avoid pileup
-  aux_t *aux = (aux_t*)data; // data in fact is a pointer to an auxiliary structure
-  int ret = aux->iter? bam_iter_read(aux->fp, aux->iter, b) : bam_read1(aux->fp, b);
-  if ((int)b->core.qual < aux->min_mapQ) b->core.flag |= BAM_FUNMAP;
-  return ret;
-}
-
 int assignTidToLocations(struct regionArray *locations, bam_header_t *h){
   int anyAssigned=0;
   int dummy1, dummy2;
@@ -315,55 +307,6 @@ int fetchFunc(const bam1_t *b, void *data){
   if(isInsideTarget)addNameToBuffer(&regionArrayAndCounter->names,bam1_qname(b));
   //free(cigarBuffer); //I think bam1_cigar actually returns a pointer to something inside b and things crash if we free it. let bam take care of it
   return(0);  
-}
-
-int getCountsFromFiles(aux_t **data, bam_index_t **indices, int nFiles, region reg, int baseQ, int **counts){
-  int base, anyBase;
-  int gap;
-  int pos;
-  int ii, jj;
-  int nBases=reg.end-reg.start+1;
-  bam_mplp_t mplp;
-  int *n_plp;
-  const bam_pileup1_t **plp;
-  n_plp = calloc(nFiles, sizeof(int)); // n_plp[i] is the number of covering reads from the i-th BAM
-  plp = calloc(nFiles, sizeof(void*)); // plp[i] points to the array of covering reads (internal in mplp)
-
-  for(ii=0; ii<nFiles; ii++)data[ii]->iter = bam_iter_query(indices[ii], reg.tid, reg.tStart, reg.end); // set the iterator
-  mplp = bam_mplp_init(nFiles, read_bam, (void**)data); // initialization
-  bam_mplp_set_maxcnt(mplp,INT_MAX); //Otherwise reads/base is silently and magically capped at 8000 thanks to samtools. samtools evaluates with > so INT_MAX should be safe
-  //loop through region
-  base=0;
-  anyBase=0;
-  while (bam_mplp_auto(mplp, &reg.tid, &pos, n_plp, plp) > 0) { // come to the next covered position
-    if (pos < reg.tStart || pos >= reg.end) continue; // out of range; skip //tStart is 0-based and end is 1-based
-    if(base>=nBases){
-      fprintf(stderr,"More bases than region size in %s\n",printRegion(&reg));
-      exit(4);
-    }
-    for (ii = 0; ii < nFiles; ++ii) { // base level filters have to go here
-      gap=0;
-      for (jj = 0; jj < n_plp[ii]; ++jj) {
-        const bam_pileup1_t *p = plp[ii] + jj; // DON'T modfity plp[][] unless you really know
-        if (p->is_del || p->is_refskip) ++gap; // having dels or refskips at tid:pos
-        else if (bam1_qual(p->b)[p->qpos] < baseQ) ++gap; // low base quality
-      }
-      counts[ii][pos-reg.tStart]=n_plp[ii] - gap; 
-      if(!anyBase && counts[ii][base]>0)anyBase=1;
-    }
-    //printf("Base %d/%d of %d\n",base,pos,nBases);
-    base++;
-  }
-  //skips uncovered positions
-  //if(base!=nBases){
-    //fprintf(stderr,"Less bases (%d) than region size (%d) in %s\n",base,nBases,printRegion(&reg));
-    //exit(6);
-  //}
-  bam_mplp_destroy(mplp);
-  free(n_plp);
-  free(plp);
-  for(ii=0; ii<nFiles; ii++)if(data[ii]->iter)bam_iter_destroy(data[ii]->iter);
-  return(!anyBase);//0 if any reads found
 }
 
 int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStopArray *breaks, const region *location, int nFiles, int **exonCounts, int onlyPaired, nameBuffer *nameStores,int reportGlobalUnique){

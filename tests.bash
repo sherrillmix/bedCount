@@ -30,8 +30,7 @@ read01	147	chr1	19	40	10M	=	1	0	GGGGGTTTTT	>>>>>>>>>>
 ">$samFile2
 samtools/samtools view -bS $samFile2 >$bamFile2 2>/dev/null
 samtools/samtools sort -f $bamFile2 $sortBamFile2
-samtools/samtools index $sortBamFile2
-
+samtools/samtools index $sortBamFile2 
 
 bedFile=$(tempfile).bed
 echo "chr1	19	20	region1
@@ -54,7 +53,9 @@ echo "Testing bedCount"
 ./bedCount -b $bedFile $sortBamFile $sortBamFile2 -B 0 -s -G 2>/dev/null|tail -1|grep "GLOBAL	GLOBAL	2	1" >/dev/null|| { echo "Unexpected output with 0 border and not require pair and global"; exit 1; }
 ./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -s -G 2>/dev/null|tail -1|grep "GLOBAL	GLOBAL	3	2" >/dev/null|| { echo "Unexpected output with 0 border and not require pair and global"; exit 1; }
 ./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -G 2>/dev/null|tail -1|grep "GLOBAL	GLOBAL	1	1" >/dev/null|| { echo "Unexpected output with 0 border and pair and global"; exit 1; }
-./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -G -t 2 2>/dev/null|tail -1|grep "GLOBAL	GLOBAL	1	1" >/dev/null|| { echo "Unexpected output 2 threads"; exit 1; }
+./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -G -t 2 -v 2>/dev/null|tail -1|grep "GLOBAL	GLOBAL	1	1" >/dev/null|| { echo "Unexpected output 2 threads"; exit 1; }
+./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -s -Q 35 2>/dev/null|head -1|grep "chr1:2-25	chr1:2-25	3	2" >/dev/null|| { echo "Unexpected out with Q35"; exit 1; }
+#./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -s -Q 36 2>/dev/null|head -1|grep "chr1:2-25	chr1:2-25	2	1" >/dev/null|| { echo "Unexpected with Q36"; exit 1; }
 
 echo "Testing bam2depth"
 ./bam2depth 2>/dev/null && { echo "Missing files did not fail"; exit 1; }
