@@ -14,8 +14,8 @@ read03	1	chr1	10	40	10M	=	1	0	ACACACACAC	>>>>>>>>>>
 read01	147	chr1	19	40	10M	=	1	0	GGGGGTTTTT	>>>>>>>>>>
 ">$samFile
 samtools/samtools view -bS $samFile >$bamFile 2>/dev/null
-samtools sort -f $bamFile ${sortBamFile}
-samtools index $sortBamFile
+samtools/samtools sort -f $bamFile ${sortBamFile}
+samtools/samtools index $sortBamFile
 
 bedFile=$(tempfile).bed
 echo "chr1 19 20
