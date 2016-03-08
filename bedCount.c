@@ -108,6 +108,8 @@ typedef struct {
   char chr[MAX_CHR_LENGTH];
   int start, tStart;
   int end;
+  char strand;
+  char name[MAX_CHR_LENGTH];
   int32_t tid;
 } region;
 
@@ -191,15 +193,18 @@ int getBedLine(FILE *fp,region* out){
   for(ii=0;ii<strlen(buffer);ii++){
     if(buffer[ii]=='\t'||buffer[ii]=='\n'){
       tmp[tmpPos]='\0';
+		if(tmpPos>MAX_CHR_LENGTH)tmp[MAX_CHR_LENGTH]='\0'; //avoid buffer overflow by truncating
       switch (field) {
         case 0: strcpy(out->chr,tmp); break;
         case 1: setRegionStart(out, atoi(tmp)+1); break; //+1 to deal with ucsc 0-based starts
         case 2: out->end = atoi(tmp); break;
+        case 3: strcpy(out->name,tmp); break;
+        case 4: out->strand = tmp[0]; break;
       }
 
       field++;
       tmpPos=0;
-      if(field>2)break;
+      if(field>4)break;
     }else{
       tmp[tmpPos]=buffer[ii];
       tmpPos++;
@@ -207,6 +212,11 @@ int getBedLine(FILE *fp,region* out){
   }
   //make sure we get the whole line (discarding anything in other fields)
   while(buffer[strlen(buffer)-1]!='\n' && fgets(buffer,BED_READ_LENGTH,fp) != NULL){}
+  //deal with empty
+  if(field<2){ fprintf(stderr,"Incomplete bed line: %s\n",buffer); return(9); }
+  if(field<3)sprintRegion(out->name,out);
+  if(field<4)out->strand ='*';
+
   return(0);
 }
 
