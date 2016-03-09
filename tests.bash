@@ -47,6 +47,10 @@ bedFile4=$(tempfile).bed
 echo "chrZ	1	25	region1
 chrZ	24	25	region2">$bedFile4
 
+bedFile5=$(tempfile).bed
+echo "chr1	1	15	region1	-
+chr1	24	25	region2	+">$bedFile5
+
 echo "Testing bedCount"
 ./bedCount 2>/dev/null && { echo "Missing files did not fail"; exit 1; }
 ./bedCount -h |grep Usage >/dev/null|| { echo "-h did not generate usage"; exit 1; }
@@ -65,6 +69,8 @@ echo "Testing bedCount"
 ./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -G -t 2 -v 2>/dev/null|tail -1|grep "GLOBAL	GLOBAL	1	1" >/dev/null|| { echo "Unexpected output 2 threads"; exit 1; }
 ./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -s -Q 35 2>/dev/null|head -1|grep "chr1:2-25	chr1:2-25	3	2" >/dev/null|| { echo "Unexpected out with Q35"; exit 1; }
 ./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -s -Q 36 2>/dev/null|head -1|grep "chr1:2-25	chr1:2-25	2	1" >/dev/null|| { echo "Unexpected with Q36"; exit 1; }
+./bedCount -b $bedFile5 $sortBamFile $sortBamFile2 -B 0 2>/dev/null|head -1|grep "chr1:2-15	chr1:2-15	0	0" >/dev/null|| { echo "Unexpected result with strand"; exit 1; }
+./bedCount -b $bedFile5 $sortBamFile $sortBamFile2 -B 0 2>/dev/null|tail -1|grep "chr1:25-25	chr1:25-25	1	1" >/dev/null|| { echo "Unexpected result with strand"; exit 1; }
 
 echo "Testing bam2depth"
 ./bam2depth 2>/dev/null && { echo "Missing files did not fail"; exit 1; }
@@ -82,4 +88,8 @@ echo "Testing bam2depth"
 ./bam2depth $sortBamFile $sortBamFile2 -r chr1:10-11 -q 40 |tail -1|grep "chr1	11	1	0" >/dev/null|| { echo "Multiple depth count with base qual messed up"; exit 1; }
 ./bam2depth $sortBamFile $sortBamFile2 -r chr1:10-11 -q 41 |tail -1|grep "chr1	11	0	0" >/dev/null|| { echo "Multiple depth count with base qual messed up"; exit 1; }
 echo "All clear"
+
+rm $bedFile1 $bedFile2 $bedFile3 $bedFile4 $bedFile5
+rm $bamFile $bamFile2 $sortBamFile $sortBamFile2 $samFile $samFile2
+
 exit 0
