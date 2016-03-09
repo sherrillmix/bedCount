@@ -18,12 +18,12 @@ make
 ## Usage
 ### bedCount
 ```
-Usage: ./bedCount [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] <in1.bam> [...]
+Usage: ./bedCount [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] [-s] [-G] [-v] [-h] <in1.bam> [...]
   first and additional arguments: bam files to be parsed
  -Q: only count reads with a map quality greater than or equal this (default:0) 
  -B: don't count reads only falling within this number of bases of the borders of a region (default: 15)
  -t: number of threads to use (default: 1)
- -s: only report good pairs (1 for only pairs, 0 for all, default: 1)
+ -s: do not filter out reads not in a well mapped pair. Use -s for single ended data (default: filter out unpaired)
  -G report the total unique reads combined over all the regions
  -v: increase verbosity
  -h: display this message and exit

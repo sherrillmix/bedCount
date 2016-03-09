@@ -503,7 +503,7 @@ int main_depth(int argc, char *argv[])
   nameBuffer **nameStore;
 
   char usage[50000];
-  sprintf(usage,"Usage: %.1000s [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] <in1.bam> [...]\n  first and additional arguments: bam files to be parsed\n -Q: only count reads with a map quality greater than or equal this (default:0) \n -B: don't count reads only falling within this number of bases of the borders of a region (default: 15)\n -t: number of threads to use (default: 1)\n -s: only report good pairs (1 for only pairs, 0 for all, default: 1)\n -G report the total unique reads combined over all the regions\n -v: increase verbosity\n -h: display this message and exit\n",argv[0]);
+  sprintf(usage,"Usage: %.1000s [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] [-s] [-G] [-v] [-h] <in1.bam> [...]\n  first and additional arguments: bam files to be parsed\n -Q: only count reads with a map quality greater than or equal this (default:0) \n -B: don't count reads only falling within this number of bases of the borders of a region (default: 15)\n -t: number of threads to use (default: 1)\n -s: do not filter out reads not in a well mapped pair. Use -s for single ended data (default: filter out unpaired)\n -G report the total unique reads combined over all the regions\n -v: increase verbosity\n -h: display this message and exit\n",argv[0]);
 
 
   // parse the command line
@@ -513,7 +513,7 @@ int main_depth(int argc, char *argv[])
       case 'Q': mapQ = atoi(optarg); break;    // mapping quality threshold
       case 'B': breakPadding = atoi(optarg); break; //don't count reads only falling within this number of bases within break
       case 't': nThreads = atoi(optarg); break; //number of threads to use
-      case 's': onlyPaired = 0; break; //only report good pairs
+      case 's': onlyPaired = 0; break; //do not report only report good pairs
       case 'G': reportGlobalUnique = 1; break; //report the total unique reads in all regions
       case 'v': vocal = 1; break; //report progress to stderr
       case 'h':
