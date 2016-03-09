@@ -11,8 +11,8 @@ samtools/libbam.a: samtools-0.1.19.tar.bz2
 TEMP := $(shell mktemp)
 TEMP2 := $(shell mktemp)
 README.md: bam2depth bedCount README.template makefile
-	./bam2depth -h>$(TEMP)
-	./bedCount -h>$(TEMP2)
+	./bedCount -h>$(TEMP)
+	./bam2depth -h>$(TEMP2)
 	sed -e "/##BEDCOUNT_USAGEHERE##/{r $(TEMP)" -e "d;}" -e "/##BAM2DEPTH_USAGEHERE##/{r $(TEMP2)" -e "d;}" <README.template >README.md
 
 bam2depth : bam2depth.c samtools/libbam.a
