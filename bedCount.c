@@ -213,9 +213,9 @@ int getBedLine(FILE *fp,region* out){
   //make sure we get the whole line (discarding anything in other fields)
   while(buffer[strlen(buffer)-1]!='\n' && fgets(buffer,BED_READ_LENGTH,fp) != NULL){}
   //deal with empty
-  if(field<2){ fprintf(stderr,"Incomplete bed line: %s\n",buffer); return(9); }
-  if(field<3)sprintRegion(out->name,out);
-  if(field<4)out->strand ='*';
+  if(field<3){ fprintf(stderr,"Incomplete bed line: %s\n",buffer); return(9); }
+  if(field<4)sprintRegion(out->name,out);
+  if(field<5)out->strand ='*';
 
   return(0);
 }
@@ -274,6 +274,18 @@ typedef struct {
 } fetchData;
 #define NEW_FETCH_DATA(X) fetchData X;X.names.nNames=0;X.names.nBuffers=0;X.onlyPaired=1;
 
+int checkStrand(const char strand,const char flag){
+  if(strand=='*')return(1);
+  if(strand == '-'){
+    if(flag & BAM_FREVERSE && flag & BAM_FREAD1)return(1); 
+    if(!(flag & BAM_FREVERSE) && flag & BAM_FREAD2)return(1);
+  }
+  if(strand == '+'){
+    if(flag & BAM_FREVERSE && flag & BAM_FREAD2)return(1); 
+    if(!(flag & BAM_FREVERSE) && flag & BAM_FREAD1)return(1);
+  }
+  return(0);
+}
 
 // callback for bam_fetch()  
 int fetchFunc(const bam1_t *b, void *data){  
@@ -291,7 +303,10 @@ int fetchFunc(const bam1_t *b, void *data){
   //flag 256 => not primary alignment. samtools depth appears to ignore these by default so I guess I'll follow
   //flag 1 => read paired. Only keep pairs (could add option)
   //flag 2 => read mapped in proper pair. Only keep proper pairs
-  if(b->core.qual < mapQ || b->core.flag & BAM_FSECONDARY || ( onlyPaired && (!(b->core.flag & BAM_FPAIRED) || !(b->core.flag & BAM_FPROPER_PAIR))))return(0);
+  if(b->core.flag & BAM_FSECONDARY || ( onlyPaired && (!(b->core.flag & BAM_FPAIRED) || !(b->core.flag & BAM_FPROPER_PAIR))))return(0);
+  //mapping quality too poor
+  if(b->core.qual < mapQ)return(0);
+
 
   for(ii=0;ii<b->core.n_cigar;ii++){
     operation=((cigarBuffer[ii])&0xf);
@@ -304,7 +319,7 @@ int fetchFunc(const bam1_t *b, void *data){
 
     if((operation==0||operation==8||operation==7)&&length>0){
       for(jj=0;jj<region->num;jj++){
-        if(region->regions[jj].start <= operationEnd && region->regions[jj].end >= genomePos){
+        if(region->regions[jj].start <= operationEnd && region->regions[jj].end >= genomePos && checkStrand(region->regions[jj].strand,b->core.flag)){
           //printf("%d/%d %d-%d:%d\n",ii+1,b->core.n_cigar,genomePos,operationEnd,operation);
           isInsideTarget=1;
           break;
@@ -331,6 +346,8 @@ int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStop
   regionArrayAndCounter.onlyPaired=onlyPaired;
   regionArrayAndCounter.min_mapQ=min_mapQ;
   strcpy(regionArrayAndCounter.regionArray.regions[0].chr,location->chr);
+  strcpy(regionArrayAndCounter.regionArray.regions[0].name,location->name);
+  regionArrayAndCounter.regionArray.regions[0].strand=location->strand;
 
   for(ii=0;ii<breaks->num;ii++){ 
     if(breaks->startStop[1][ii]<breaks->startStop[0][ii]){
