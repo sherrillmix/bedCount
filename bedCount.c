@@ -213,7 +213,7 @@ int getBedLine(FILE *fp,region* out){
   //make sure we get the whole line (discarding anything in other fields)
   while(buffer[strlen(buffer)-1]!='\n' && fgets(buffer,BED_READ_LENGTH,fp) != NULL){}
   //deal with empty
-  if(field<3){ fprintf(stderr,"Incomplete bed line: %s\n",buffer); return(9); }
+  if(field<3){ fprintf(stderr,"Incomplete bed line"); exit(9); }
   if(field<4)sprintRegion(out->name,out);
   if(field<5)out->strand ='*';
 
