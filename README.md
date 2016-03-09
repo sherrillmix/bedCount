@@ -3,7 +3,7 @@
 [![codecov.io](https://codecov.io/github/sherrillmix/bedCount/coverage.svg?branch=master)](https://codecov.io/github/sherrillmix/bedCount?branch=master)
 
 ## Introduction
-Tools to analyze bam files.
+Some preliminary tools using the [samtools](http://www.htslib.org/) library to analyze bam files.
 
 ## Installation
 To install, [download the repository](https://github.com/sherrillmix/bedCount/archive/master.zip) (or git clone) and run make in the resulting directory:
