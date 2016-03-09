@@ -1,4 +1,4 @@
-# bamTools: Simple tools to efficiently parse bam files
+# bedCount: Simple tools to efficiently parse bam files
 [![Build Status](https://travis-ci.org/sherrillmix/bedCount.svg?branch=master)](https://travis-ci.org/sherrillmix/bedCount)
 [![codecov.io](https://codecov.io/github/sherrillmix/bedCount/coverage.svg?branch=master)](https://codecov.io/github/sherrillmix/bedCount?branch=master)
 
