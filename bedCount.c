@@ -194,7 +194,7 @@ int getBedLine(FILE *fp,region* out){
   for(ii=0;ii<strlen(buffer);ii++){
     if(buffer[ii]=='\t'||buffer[ii]=='\n'){
       tmp[tmpPos]='\0';
-		if(tmpPos>MAX_CHR_LENGTH)tmp[MAX_CHR_LENGTH]='\0'; //avoid buffer overflow by truncating
+      if(tmpPos>MAX_CHR_LENGTH)tmp[MAX_CHR_LENGTH]='\0'; //avoid buffer overflow by truncating
       switch (field) {
         case 0: strcpy(out->chr,tmp); break;
         case 1: setRegionStart(out, atoi(tmp)+1); break; //+1 to deal with ucsc 0-based starts
@@ -276,17 +276,17 @@ typedef struct {
 } fetchData;
 #define NEW_FETCH_DATA(X) fetchData X;X.names.nNames=0;X.names.nBuffers=0;X.singleEnd=1;
 
-int checkStrand(const char strand,const char flag, const int singleStrand){
+int checkStrand(const char strand,const char flag, const int singleEnd){
   if(strand=='*')return(1);
   if(strand == '-'){
     if(flag & BAM_FREVERSE && flag & BAM_FREAD1)return(1);
-    if(flag & BAM_FREVERSE && singleStrand)return(1);
+    if(flag & BAM_FREVERSE && singleEnd)return(1);
     if(!(flag & BAM_FREVERSE) && flag & BAM_FREAD2)return(1);
   }
   if(strand == '+'){
     if(flag & BAM_FREVERSE && flag & BAM_FREAD2)return(1);
     if(!(flag & BAM_FREVERSE) && flag & BAM_FREAD1)return(1);
-    if(!(flag & BAM_FREVERSE) && singleStrand)return(1);
+    if(!(flag & BAM_FREVERSE) && singleEnd)return(1);
   }
   return(0);
 }
@@ -307,7 +307,7 @@ int fetchFunc(const bam1_t *b, void *data){
   //flag 256 => not primary alignment. samtools depth appears to ignore these by default so I guess I'll follow
   //flag 1 => read paired. Only keep pairs (could add option)
   //flag 2 => read mapped in proper pair. Only keep proper pairs
-  if(b->core.flag & BAM_FSECONDARY || ( singleEnd && (!(b->core.flag & BAM_FPAIRED) || !(b->core.flag & BAM_FPROPER_PAIR))))return(0);
+  if(b->core.flag & BAM_FSECONDARY || ( !singleEnd && (!(b->core.flag & BAM_FPAIRED) || !(b->core.flag & BAM_FPROPER_PAIR))))return(0);
   //mapping quality too poor
   if(b->core.qual < mapQ)return(0);
 
@@ -497,7 +497,7 @@ int main_depth(int argc, char *argv[])
 
   int nThreads=1;
   int breakPadding=15;
-  int singleEnd=1;
+  int singleEnd=0;
   int *globalCounts;
   int reportGlobalUnique=0;
   int vocal=0;
@@ -517,7 +517,7 @@ int main_depth(int argc, char *argv[])
       case 'Q': mapQ = atoi(optarg); break;    // mapping quality threshold
       case 'B': breakPadding = atoi(optarg); break; //don't count reads only falling within this number of bases within break
       case 't': nThreads = atoi(optarg); break; //number of threads to use
-      case 's': singleEnd = 0; break; //do not report only report good pairs
+      case 's': singleEnd = 1; break; //do not report only report good pairs
       case 'G': reportGlobalUnique = 1; break; //report the total unique reads in all regions
       case 'v': vocal = 1; break; //report progress to stderr
       case 'h':
