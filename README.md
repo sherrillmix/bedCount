@@ -23,7 +23,7 @@ Usage: ./bedCount [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] [-s] [-G] 
  -Q: only count reads with a map quality greater than or equal this (default:0) 
  -B: don't count reads only falling within this number of bases of the borders of a region (default: 15)
  -t: number of threads to use (default: 1)
- -s: do not filter out reads not in a well mapped pair. Use -s for single ended data (default: filter out unpaired)
+ -s: Data is single end reads. Do not filter out reads not in a well mapped pair. Assume strandedness behaves as first read (default: paired reads)
  -G report the total unique reads combined over all the regions
  -v: increase verbosity
  -h: display this message and exit
