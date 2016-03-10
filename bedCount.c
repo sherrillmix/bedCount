@@ -122,7 +122,7 @@ int sprintRegion(char *str,const region *reg){
   return(0);
 }
 char* printRegion(const region *reg){//careful with this one when parallel
-  static char text[BED_READ_LENGTH];  
+  static char text[BED_READ_LENGTH];
   sprintRegion(text,reg);
   return(text);
 }
@@ -178,8 +178,9 @@ int fprintExonCountArray(FILE *fp,exonCountArray *exons,int numGenes){
 
 
 int getBedLine(FILE *fp,region* out){
-  char buffer[BED_READ_LENGTH]; //set this outside so we don't have to create every time? 
-  char tmp[BED_READ_LENGTH]; 
+  char buffer[BED_READ_LENGTH]; //set this outside so we don't have to create every time?
+  char tmp[BED_READ_LENGTH];
+  //should deal with empty lines here
   if(fgets(buffer,BED_READ_LENGTH,fp) == NULL){
     if(feof(fp))return(1);
     fprintf(stderr,"Problem reading file %s\n",strerror(ferror(fp)));
@@ -216,6 +217,7 @@ int getBedLine(FILE *fp,region* out){
   if(field<3){ fprintf(stderr,"Incomplete bed line"); exit(9); }
   if(field<4)sprintRegion(out->name,out);
   if(field<5)out->strand ='*';
+  fprintf(stderr,"|%c|",out->strand);
 
   return(0);
 }
@@ -259,7 +261,7 @@ int assignTidToLocations(struct regionArray *locations, bam_header_t *h){
       anyAssigned=1;
     }
   }
-  return(!anyAssigned);  
+  return(!anyAssigned);
 }
 
 
@@ -269,30 +271,32 @@ typedef struct {
   int *counter;
   struct regionArray regionArray;
   nameBuffer names;
-  int onlyPaired;
+  int singleEnd;
   int min_mapQ;
 } fetchData;
-#define NEW_FETCH_DATA(X) fetchData X;X.names.nNames=0;X.names.nBuffers=0;X.onlyPaired=1;
+#define NEW_FETCH_DATA(X) fetchData X;X.names.nNames=0;X.names.nBuffers=0;X.singleEnd=1;
 
-int checkStrand(const char strand,const char flag){
+int checkStrand(const char strand,const char flag, const int singleStrand){
   if(strand=='*')return(1);
   if(strand == '-'){
-    if(flag & BAM_FREVERSE && flag & BAM_FREAD1)return(1); 
+    if(flag & BAM_FREVERSE && flag & BAM_FREAD1)return(1);
+    if(flag & BAM_FREVERSE && singleStrand)return(1);
     if(!(flag & BAM_FREVERSE) && flag & BAM_FREAD2)return(1);
   }
   if(strand == '+'){
-    if(flag & BAM_FREVERSE && flag & BAM_FREAD2)return(1); 
+    if(flag & BAM_FREVERSE && flag & BAM_FREAD2)return(1);
     if(!(flag & BAM_FREVERSE) && flag & BAM_FREAD1)return(1);
+    if(!(flag & BAM_FREVERSE) && singleStrand)return(1);
   }
   return(0);
 }
 
-// callback for bam_fetch()  
-int fetchFunc(const bam1_t *b, void *data){  
+// callback for bam_fetch()
+int fetchFunc(const bam1_t *b, void *data){
   //convert data into regionArray
   fetchData *regionArrayAndCounter=(fetchData*)data;
   struct regionArray *region=&regionArrayAndCounter->regionArray;
-  int onlyPaired=regionArrayAndCounter->onlyPaired;
+  int singleEnd=regionArrayAndCounter->singleEnd;
   int mapQ=regionArrayAndCounter->min_mapQ;
   int ii,jj;
   uint32_t operation,length;
@@ -303,7 +307,7 @@ int fetchFunc(const bam1_t *b, void *data){
   //flag 256 => not primary alignment. samtools depth appears to ignore these by default so I guess I'll follow
   //flag 1 => read paired. Only keep pairs (could add option)
   //flag 2 => read mapped in proper pair. Only keep proper pairs
-  if(b->core.flag & BAM_FSECONDARY || ( onlyPaired && (!(b->core.flag & BAM_FPAIRED) || !(b->core.flag & BAM_FPROPER_PAIR))))return(0);
+  if(b->core.flag & BAM_FSECONDARY || ( singleEnd && (!(b->core.flag & BAM_FPAIRED) || !(b->core.flag & BAM_FPROPER_PAIR))))return(0);
   //mapping quality too poor
   if(b->core.qual < mapQ)return(0);
 
@@ -319,7 +323,7 @@ int fetchFunc(const bam1_t *b, void *data){
 
     if((operation==0||operation==8||operation==7)&&length>0){
       for(jj=0;jj<region->num;jj++){
-        if(region->regions[jj].start <= operationEnd && region->regions[jj].end >= genomePos && checkStrand(region->regions[jj].strand,b->core.flag)){
+        if(region->regions[jj].start <= operationEnd && region->regions[jj].end >= genomePos && checkStrand(region->regions[jj].strand,b->core.flag,singleEnd)){
           //printf("%d/%d %d-%d:%d\n",ii+1,b->core.n_cigar,genomePos,operationEnd,operation);
           isInsideTarget=1;
           break;
@@ -332,10 +336,10 @@ int fetchFunc(const bam1_t *b, void *data){
   if(isInsideTarget)*regionArrayAndCounter->counter=*regionArrayAndCounter->counter+1;
   if(isInsideTarget)addNameToBuffer(&regionArrayAndCounter->names,bam1_qname(b));
   //free(cigarBuffer); //I think bam1_cigar actually returns a pointer to something inside b and things crash if we free it. let bam take care of it
-  return(0);  
+  return(0);
 }
 
-int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStopArray *breaks, const region *location, int nFiles, int **exonCounts, int onlyPaired,int min_mapQ, nameBuffer *nameStores,int reportGlobalUnique){
+int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStopArray *breaks, const region *location, int nFiles, int **exonCounts, int singleEnd,int min_mapQ, nameBuffer *nameStores,int reportGlobalUnique){
   int ii,jj;
   //fetchData regionArrayAndCounter;
   NEW_FETCH_DATA(regionArrayAndCounter);
@@ -343,13 +347,13 @@ int getUniqueReadsFromFiles(aux_t **data, bam_index_t **indices, const startStop
   regionArrayAndCounter.regionArray.regions=(region*)malloc(sizeof(region));
   regionArrayAndCounter.regionArray.regions[0].tid=location->tid;
   regionArrayAndCounter.regionArray.num=1;
-  regionArrayAndCounter.onlyPaired=onlyPaired;
+  regionArrayAndCounter.singleEnd=singleEnd;
   regionArrayAndCounter.min_mapQ=min_mapQ;
   strcpy(regionArrayAndCounter.regionArray.regions[0].chr,location->chr);
   strcpy(regionArrayAndCounter.regionArray.regions[0].name,location->name);
   regionArrayAndCounter.regionArray.regions[0].strand=location->strand;
 
-  for(ii=0;ii<breaks->num;ii++){ 
+  for(ii=0;ii<breaks->num;ii++){
     if(breaks->startStop[1][ii]<breaks->startStop[0][ii]){
       fprintf(stderr,"Start greater than end when finding unique reads in breaks:%s\n",printRegion(location));
       exit(9);
@@ -405,7 +409,7 @@ int destroyExonCountArray(exonCountArray *exonStore, int num){
   return(0);
 }
 
-double getCountForRegion(region location, bam_index_t **indices, aux_t **data, int nFiles, int breakPadding, exonCountArray *exonStoreCell, int onlyPaired, nameBuffer *nameStores,int reportGlobalUnique, int min_mapQ){
+double getCountForRegion(region location, bam_index_t **indices, aux_t **data, int nFiles, int breakPadding, exonCountArray *exonStoreCell, int singleEnd, nameBuffer *nameStores,int reportGlobalUnique, int min_mapQ){
   int nBases;
   int ii;
   int isTooShort=0;
@@ -424,7 +428,7 @@ double getCountForRegion(region location, bam_index_t **indices, aux_t **data, i
   int **exonCounts=calloc(nFiles,sizeof(int*));
   for(ii=0;ii<nFiles;ii++)exonCounts[ii]=calloc(breaks.num,sizeof(int));
 
-  if(!isTooShort)getUniqueReadsFromFiles(data, indices, &breaks, &location, nFiles, exonCounts, onlyPaired, min_mapQ, nameStores,reportGlobalUnique);
+  if(!isTooShort)getUniqueReadsFromFiles(data, indices, &breaks, &location, nFiles, exonCounts, singleEnd, min_mapQ, nameStores,reportGlobalUnique);
   
   //Store break counts for later output
   storeExonCounts(exonStoreCell,&breaks,exonCounts,nFiles,&location);
@@ -434,7 +438,7 @@ double getCountForRegion(region location, bam_index_t **indices, aux_t **data, i
   //Clean up break finding
   destroyStartStopArray(&breaks);
 
-  //might want to return break coords and counts too 
+  //might want to return break coords and counts too
   if(isTooShort)return(TOOSHORT);
   else return(0);
 }
@@ -448,7 +452,7 @@ struct scoreArgs{
   int stepSize;
   int start;
   int breakPadding;
-  int onlyPaired;
+  int singleEnd;
   exonCountArray *exonStore;
   nameBuffer *nameStore;
   int reportGlobalUnique;
@@ -466,7 +470,7 @@ void* getScoreParallel(void *getScoreArgs){
       fflush(stderr);
     }
     //if(DEBUG)fprintf(stderr,"Thread %d working on region %d (%s)\n",args->start,ii,printRegion(&args->locations.regions[ii]));
-    getCountForRegion(args->locations.regions[ii], args->indices, args->data, args->nFiles, args->breakPadding, &args->exonStore[ii],args->onlyPaired,args->nameStore,args->reportGlobalUnique,args->min_mapQ);
+    getCountForRegion(args->locations.regions[ii], args->indices, args->data, args->nFiles, args->breakPadding, &args->exonStore[ii],args->singleEnd,args->nameStore,args->reportGlobalUnique,args->min_mapQ);
     //if(DEBUG)fprintf(stderr,"Thread %d finished region %d. Score: %.3f\n",args->start,ii,args->scores[ii]);
   }
   pthread_exit(NULL);
@@ -478,14 +482,14 @@ int main(int argc, char *argv[])
 int main_depth(int argc, char *argv[])
 #endif
 {
-  int ii, jj, nFiles; 
+  int ii, jj, nFiles;
   int mapQ = 0;
   bam_header_t *h=0; // BAM header of the 1st input
   aux_t ***data;
   bam_index_t ***indices;
 
   char *bed = NULL;
-  FILE *bedFile;  
+  FILE *bedFile;
 
   struct regionArray locations;
   pthread_t *threads;
@@ -493,7 +497,7 @@ int main_depth(int argc, char *argv[])
 
   int nThreads=1;
   int breakPadding=15;
-  int onlyPaired=1;
+  int singleEnd=1;
   int *globalCounts;
   int reportGlobalUnique=0;
   int vocal=0;
@@ -503,7 +507,7 @@ int main_depth(int argc, char *argv[])
   nameBuffer **nameStore;
 
   char usage[50000];
-  sprintf(usage,"Usage: %.1000s [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] [-s] [-G] [-v] [-h] <in1.bam> [...]\n  first and additional arguments: bam files to be parsed\n -Q: only count reads with a map quality greater than or equal this (default:0) \n -B: don't count reads only falling within this number of bases of the borders of a region (default: 15)\n -t: number of threads to use (default: 1)\n -s: do not filter out reads not in a well mapped pair. Use -s for single ended data (default: filter out unpaired)\n -G report the total unique reads combined over all the regions\n -v: increase verbosity\n -h: display this message and exit\n",argv[0]);
+  sprintf(usage,"Usage: %.1000s [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] [-s] [-G] [-v] [-h] <in1.bam> [...]\n  first and additional arguments: bam files to be parsed\n -Q: only count reads with a map quality greater than or equal this (default:0) \n -B: don't count reads only falling within this number of bases of the borders of a region (default: 15)\n -t: number of threads to use (default: 1)\n -s: Data is single end reads. Do not filter out reads not in a well mapped pair. Assume strandedness behaves as first read (default: paired reads)\n -G report the total unique reads combined over all the regions\n -v: increase verbosity\n -h: display this message and exit\n",argv[0]);
 
 
   // parse the command line
@@ -513,7 +517,7 @@ int main_depth(int argc, char *argv[])
       case 'Q': mapQ = atoi(optarg); break;    // mapping quality threshold
       case 'B': breakPadding = atoi(optarg); break; //don't count reads only falling within this number of bases within break
       case 't': nThreads = atoi(optarg); break; //number of threads to use
-      case 's': onlyPaired = 0; break; //do not report only report good pairs
+      case 's': singleEnd = 0; break; //do not report only report good pairs
       case 'G': reportGlobalUnique = 1; break; //report the total unique reads in all regions
       case 'v': vocal = 1; break; //report progress to stderr
       case 'h':
@@ -598,7 +602,7 @@ int main_depth(int argc, char *argv[])
     args[ii].stepSize=nThreads;
     args[ii].start=ii;
     args[ii].exonStore=exonStore;
-    args[ii].onlyPaired=onlyPaired;
+    args[ii].singleEnd=singleEnd;
     args[ii].nameStore=nameStore[ii];
     args[ii].reportGlobalUnique=reportGlobalUnique;
     args[ii].vocal=vocal;
