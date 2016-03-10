@@ -217,7 +217,6 @@ int getBedLine(FILE *fp,region* out){
   if(field<3){ fprintf(stderr,"Incomplete bed line"); exit(9); }
   if(field<4)sprintRegion(out->name,out);
   if(field<5)out->strand ='*';
-  fprintf(stderr,"|%c|",out->strand);
 
   return(0);
 }

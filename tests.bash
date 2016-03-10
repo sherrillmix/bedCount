@@ -27,6 +27,10 @@ read01	99	chr1	10	40	10M	=	18	0	ACACACACAC	>>>>>>>>>>
 read02	1	chr1	10	35	8M20D2M	=	1	0	ACACACACAC	>>>>>>>>>>
 read03	1	chr1	50	40	10M	=	1	0	ACACACACAC	>>>>>>>>>>
 read01	147	chr1	19	40	10M	=	1	0	GGGGGTTTTT	>>>>>>>>>>
+read04	0	chr1	100	30	10M	=	1	0	GGGGGTTTTT	>>>>>>>>>>
+read05	16	chr1	100	30	10M	=	1	0	GGGGGTTTTT	>>>>>>>>>>
+read06	16	chr1	101	31	10M	=	1	0	GGGGGTTTTT	>>>>>>>>>>
+read07	16	chr1	102	32	10M	=	1	0	GGGGGTTTTT	>>>>>>>>>>
 ">$samFile2
 samtools/samtools view -bS $samFile2 >$bamFile2 2>/dev/null
 samtools/samtools sort -f $bamFile2 $sortBamFile2
@@ -51,6 +55,11 @@ bedFile5=$(tempfile).bed
 echo "chr1	1	15	region1	-
 chr1	24	25	region2	+">$bedFile5
 
+bedFile6=$(tempfile).bed
+echo "chr1	104	105	region1	-
+chr1	104	105	region2	+
+chr1	104	105	region2	*">$bedFile6
+
 echo "Testing bedCount"
 ./bedCount 2>/dev/null && { echo "Missing files did not fail"; exit 1; }
 ./bedCount -h |grep Usage >/dev/null|| { echo "-h did not generate usage"; exit 1; }
@@ -71,6 +80,10 @@ echo "Testing bedCount"
 ./bedCount -b $bedFile2 $sortBamFile $sortBamFile2 -B 0 -s -Q 36 2>/dev/null|head -1|grep "chr1:2-25	chr1:2-25	2	1" >/dev/null|| { echo "Unexpected with Q36"; exit 1; }
 ./bedCount -b $bedFile5 $sortBamFile $sortBamFile2 -B 0 2>/dev/null|head -1|grep "chr1:2-15	chr1:2-15	0	0" >/dev/null|| { echo "Unexpected result with strand"; exit 1; }
 ./bedCount -b $bedFile5 $sortBamFile $sortBamFile2 -B 0 2>/dev/null|tail -1|grep "chr1:25-25	chr1:25-25	1	1" >/dev/null|| { echo "Unexpected result with strand"; exit 1; }
+#check strand and single end
+./bedCount -b $bedFile6 $sortBamFile $sortBamFile2 -B 0 -G 2>/dev/null|tail -1|grep "GLOBAL	GLOBAL	0	0" >/dev/null|| { echo "Global sum not zero when all unpaired reads"; exit 1; }
+./bedCount -b $bedFile6 $sortBamFile $sortBamFile2 -B 0 -G -s 2>/dev/null|tail -1|grep "GLOBAL	GLOBAL	0	4" >/dev/null|| { echo "Global sum not correct when all unpaired reads"; exit 1; }
+./bedCount -b $bedFile6 $sortBamFile $sortBamFile2 -B 0 -s 2>/dev/null|cut -f 4|paste -sd ',' -|grep "^3,1,4$">/dev/null|| { echo "Counts not correct with single end stranded reads"; exit 1; }
 
 echo "Testing bam2depth"
 ./bam2depth 2>/dev/null && { echo "Missing files did not fail"; exit 1; }
@@ -89,7 +102,7 @@ echo "Testing bam2depth"
 ./bam2depth $sortBamFile $sortBamFile2 -r chr1:10-11 -q 41 |tail -1|grep "chr1	11	0	0" >/dev/null|| { echo "Multiple depth count with base qual messed up"; exit 1; }
 echo "All clear"
 
-rm $bedFile1 $bedFile2 $bedFile3 $bedFile4 $bedFile5
+rm $bedFile1 $bedFile2 $bedFile3 $bedFile4 $bedFile5 $bedFile6
 rm $bamFile $bamFile2 $sortBamFile $sortBamFile2 $samFile $samFile2
 
 exit 0
