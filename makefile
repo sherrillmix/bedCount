@@ -16,7 +16,7 @@ README.md: bam2depth bedCount README.template makefile
 	sed -e "/##BEDCOUNT_USAGEHERE##/{r $(TEMP)" -e "d;}" -e "/##BAM2DEPTH_USAGEHERE##/{r $(TEMP2)" -e "d;}" <README.template >README.md
 
 functions.o: functions.c functions.h
-	gcc -c functions.c -o functions.o $(FLAGS)
+	$(CC) -c functions.c -o functions.o $(FLAGS)
 
 bam2depth : bam2depth.c samtools/libbam.a functions.o
 	$(CC) -o bam2depth -D_MAIN_BAM2DEPTH bam2depth.c functions.o $(FLAGS)
@@ -26,11 +26,12 @@ bedCount : bedCount.c samtools/libbam.a functions.o
 
 #testBed.c 
 test: bam2depth.c bedCount.c tests.bash makefile functions.o
+	$(CC) -c functions.c -o functions.o $(FLAGS) -coverage
 	$(CC) -o bam2depth -D_MAIN_BAM2DEPTH bam2depth.c functions.o $(FLAGS) -coverage
 	$(CC) -o bedCount -D_MAIN_BAM2DEPTH bedCount.c functions.o $(FLAGS) -coverage
 	#$(CC) -Wall -o testBed testBed.c -lz -lpthread -coverage 
 	#./testBed
 	bash tests.bash
 	#gcov main.c tree.h tree.c
-	rm bam2depth bedCount
+	rm bam2depth bedCount functions.o
 	make all
