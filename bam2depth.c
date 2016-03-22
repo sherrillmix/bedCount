@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <limits.h>
 #include "bam.h"
+#include "functions.h"
 
 typedef struct {     // auxiliary data structure
   bamFile fp;      // the file handler
@@ -30,6 +31,9 @@ static int read_bam(void *data, bam1_t *b) // read level filters better go here 
   return ret;
 }
 
+
+
+
 #ifdef _MAIN_BAM2DEPTH
 int main(int argc, char *argv[])
 #else
@@ -46,6 +50,7 @@ int main_depth(int argc, char *argv[])
   bam_header_t *h = 0; // BAM header of the 1st input
   aux_t **data;
   bam_mplp_t mplp;
+  char strand='*';
   char usage[50000];
   sprintf(usage,"Usage: %.1000s [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] <in1.bam> [...]\n first and additional arguments: bam files to be parsed\n -r: region to get coverage for in samtools format e.g. chr1:1000-1029 (default: all positions in the reference)\n -b: bed file specifying multiple regions\n -q: only count positions with a quality greater than or equal this (default:0)\n -Q: only count reads with a map quality greater than or equal this (default:0) \n -d: approximate maximum depth counted for a base. In samtools version this is 8000. (default: INT_MAX)\n -h: (optional) display this message and exit\n",argv[0]);
 
@@ -85,7 +90,10 @@ int main_depth(int argc, char *argv[])
     htmp = bam_header_read(data[ii]->fp);         // read the BAM header
     if (ii == 0) {
       h = htmp; // keep the header of the 1st BAM
-      if (reg) bam_parse_region(h, reg, &tid, &beg, &end); // also parse the region
+      if (reg){
+			strand=parseRegionStrand(reg);
+			bam_parse_region(h, reg, &tid, &beg, &end); // also parse the region
+		}
     } else bam_header_destroy(htmp); // if not the 1st BAM, trash the header
     if (tid >= 0) { // if a region is specified and parsed successfully
       bam_index_t *idx = bam_index_load(argv[optind+ii]);  // load the index
@@ -109,6 +117,7 @@ int main_depth(int argc, char *argv[])
         const bam_pileup1_t *p = plp[ii] + jj; // DON'T modfity plp[][] unless you really know
         if (p->is_del || p->is_refskip) ++m; // having dels or refskips at tid:pos
         else if (bam1_qual(p->b)[p->qpos] < baseQ) ++m; // low base quality
+		  else if (!checkStrand(strand,p->b->core.flag,1)) ++m;//wrong strand
       }
       printf("\t%d", n_plp[ii] - m); // this the depth to output
     }

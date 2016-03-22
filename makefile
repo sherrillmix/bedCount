@@ -15,16 +15,19 @@ README.md: bam2depth bedCount README.template makefile
 	./bam2depth -h>$(TEMP2)
 	sed -e "/##BEDCOUNT_USAGEHERE##/{r $(TEMP)" -e "d;}" -e "/##BAM2DEPTH_USAGEHERE##/{r $(TEMP2)" -e "d;}" <README.template >README.md
 
-bam2depth : bam2depth.c samtools/libbam.a
-	$(CC) -o bam2depth -D_MAIN_BAM2DEPTH bam2depth.c $(FLAGS)
+functions.o: functions.c functions.h
+	gcc -c functions.c -o functions.o $(FLAGS)
 
-bedCount : bedCount.c samtools/libbam.a
-	$(CC) -o bedCount -D_MAIN_BAM2DEPTH bedCount.c $(FLAGS)
+bam2depth : bam2depth.c samtools/libbam.a functions.o
+	$(CC) -o bam2depth -D_MAIN_BAM2DEPTH bam2depth.c functions.o $(FLAGS)
+
+bedCount : bedCount.c samtools/libbam.a functions.o
+	$(CC) -o bedCount -D_MAIN_BAM2DEPTH bedCount.c functions.o $(FLAGS)
 
 #testBed.c 
-test: bam2depth.c bedCount.c tests.bash makefile
-	$(CC) -o bam2depth -D_MAIN_BAM2DEPTH bam2depth.c $(FLAGS) -coverage
-	$(CC) -o bedCount -D_MAIN_BAM2DEPTH bedCount.c $(FLAGS) -coverage
+test: bam2depth.c bedCount.c tests.bash makefile functions.o
+	$(CC) -o bam2depth -D_MAIN_BAM2DEPTH bam2depth.c functions.o $(FLAGS) -coverage
+	$(CC) -o bedCount -D_MAIN_BAM2DEPTH bedCount.c functions.o $(FLAGS) -coverage
 	#$(CC) -Wall -o testBed testBed.c -lz -lpthread -coverage 
 	#./testBed
 	bash tests.bash
