@@ -12,10 +12,9 @@
 #include <math.h>
 #include <pthread.h>
 #include "bam.h"
+#include "functions.h"
 
-#define WORSTPVAL -DBL_MAX
 #define NOCHROM 2
-#define NOREADS 3
 #define TOOSHORT 4
 
 #define BED_READ_LENGTH 3000
@@ -275,20 +274,6 @@ typedef struct {
 } fetchData;
 #define NEW_FETCH_DATA(X) fetchData X;X.names.nNames=0;X.names.nBuffers=0;X.singleEnd=1;
 
-int checkStrand(const char strand,const char flag, const int singleEnd){
-  if(strand=='*')return(1);
-  if(strand == '-'){
-    if(flag & BAM_FREVERSE && flag & BAM_FREAD1)return(1);
-    if(flag & BAM_FREVERSE && singleEnd)return(1);
-    if(!(flag & BAM_FREVERSE) && flag & BAM_FREAD2)return(1);
-  }
-  if(strand == '+'){
-    if(flag & BAM_FREVERSE && flag & BAM_FREAD2)return(1);
-    if(!(flag & BAM_FREVERSE) && flag & BAM_FREAD1)return(1);
-    if(!(flag & BAM_FREVERSE) && singleEnd)return(1);
-  }
-  return(0);
-}
 
 // callback for bam_fetch()
 int fetchFunc(const bam1_t *b, void *data){

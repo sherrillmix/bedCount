@@ -100,6 +100,9 @@ echo "Testing bam2depth"
 ./bam2depth $sortBamFile $sortBamFile2 -r chr1:10-11 |tail -1|grep "chr1	11	3	2" >/dev/null|| { echo "Multiple depth count messed up"; exit 1; }
 ./bam2depth $sortBamFile $sortBamFile2 -r chr1:10-11 -q 40 |tail -1|grep "chr1	11	1	0" >/dev/null|| { echo "Multiple depth count with base qual messed up"; exit 1; }
 ./bam2depth $sortBamFile $sortBamFile2 -r chr1:10-11 -q 41 |tail -1|grep "chr1	11	0	0" >/dev/null|| { echo "Multiple depth count with base qual messed up"; exit 1; }
+./bam2depth $sortBamFile $sortBamFile2 -r 'chr1:10-11*' |tail -1|grep "chr1	11	3	2" >/dev/null|| { echo "Stranded region messed up"; exit 1; }
+./bam2depth $sortBamFile $sortBamFile2 -r 'chr1:10-11+' |tail -1|grep "chr1	11	3	2" >/dev/null|| { echo "Stranded region messed up"; exit 1; }
+./bam2depth $sortBamFile $sortBamFile2 -r 'chr1:10-11-' |tail -1|grep "chr1	11	0	0" >/dev/null|| { echo "Stranded region messed up"; exit 1; }
 echo "All clear"
 
 rm $bedFile1 $bedFile2 $bedFile3 $bedFile4 $bedFile5 $bedFile6
