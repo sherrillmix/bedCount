@@ -1,5 +1,5 @@
 SAMDIR=samtools
-all : bam2depth bedCount
+all : bam2depth bedCount README.md
 .PHONY: all test
 FLAGS=-g -O2 -Wall -L$(SAMDIR) -lbam -lz -I$(SAMDIR) -lpthread
 
