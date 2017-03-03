@@ -32,7 +32,9 @@ Usage: ./bedCount [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] [-s] [-G] 
 ### bam2depth
 ```
 Usage: ./bam2depth [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] <in1.bam> [...]
- first and additional arguments: bam files to be parsed
+Output: streams to standard out a tab separated file with columns; chromosome, position, count1, count2 ..., where countX is the count for that position in the Xth file argument
+Arguments:
+ first and additional optional arguments: bam files to be parsed
  -r: region to get coverage for in samtools format e.g. chr1:1000-1029 (default: all positions in the reference)
  -b: bed file specifying multiple regions
  -q: only count positions with a quality greater than or equal this (default:0)
