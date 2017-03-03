@@ -20,7 +20,7 @@ make
 ```
 Usage: ./bedCount [-r reg] [-q baseQthres] [-Q mapQthres] [-b in.bed] [-s] [-G] [-v] [-h] <in1.bam> [...]
 Output: streams to standard out a tab separated file with columns; region, trimmedRegion, count1, count2 ...
-  where countX is is the count for that position in the Xth file argument
+  where countX is is the count for that region in the Xth file argument
 Arguments:
  first and additional arguments: bam files to be parsed
  -Q: only count reads with a map quality greater than or equal this (default:0) 
